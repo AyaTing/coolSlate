@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 from db.database import close_pool, create_pool
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth_router, calendar_router
+from routers import auth_router, calendar_router, booking_router
 import httpx
 
 
@@ -41,6 +41,7 @@ app.add_middleware(
 
 app.include_router(auth_router.router)
 app.include_router(calendar_router.router)
+app.include_router(booking_router.router)
 
 @app.get("/status")
 async def check_status():
