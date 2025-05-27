@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, date, time
 from models.service_model import ServiceType
 from enum import Enum
+from models.payment_model import PaymentStatus
 
 class OrderStatus(str, Enum):
     PENDING = "pending"
@@ -11,10 +12,6 @@ class OrderStatus(str, Enum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
-class PaymentStatus(str, Enum):
-    UNPAID = "unpaid"
-    PAID = "paid"
-    REFUNDED = "refunded"
 
 class EquipmentItem(BaseModel):
     name: str
