@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from datetime import datetime, date, time, timedelta
+from zoneinfo import ZoneInfo
 import asyncpg
 from models.service_model import ServiceType
 from models.calendar_model import (
@@ -8,6 +9,8 @@ from models.calendar_model import (
     CalendarDay,
     SlotResponse,
 )
+
+TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 
 
 async def get_available_calendar(
@@ -21,7 +24,7 @@ async def get_available_calendar(
         service_info = await db.fetchrow(select_query, service_type.value)
         if not service_info:
             raise HTTPException(status_code=400, detail="無效的服務類型")
-        today = datetime.now().date()
+        today = datetime.now(TAIPEI_TZ).date()
         display_year = year if year is not None else today.year
         display_month = month if month is not None else today.month
         try:
@@ -91,7 +94,7 @@ async def check_slot_availability(
         service_info = await db.fetchrow(select_query, service_type.value)
         if not service_info:
             raise HTTPException(status_code=400, detail="無效的服務類型")
-        today = datetime.now().date()
+        today = datetime.now(TAIPEI_TZ).date()
         if target_date <= today:
             return SlotResponse(
                 available=False,

@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from datetime import date, time, timedelta, datetime
+from zoneinfo import ZoneInfo
 from typing import List
 from models.booking_model import (
     OrderRequest,
@@ -11,6 +12,7 @@ import asyncpg
 import json
 import uuid
 
+TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 
 async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
     if len(order_data.booking_slots) < 1:
@@ -85,7 +87,7 @@ async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
             order_data.equipment_details,
             db,
         )
-        order_number = f"AC{datetime.now().strftime('%Y%m%d%H%M%S')}{str(uuid.uuid4())[:4].upper()}"
+        order_number = f"AC{datetime.now(TAIPEI_TZ).strftime('%Y%m%d%H%M%S')}{str(uuid.uuid4())[:4].upper()}"
         equipment_json = None
         if order_data.equipment_details:
             equipment_json = json.dumps(
@@ -106,7 +108,7 @@ async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
             order_data.notes,
         )
         lock_expires_at = (
-            datetime.now() + timedelta(minutes=30) if needs_locking else None
+            datetime.now(TAIPEI_TZ) + timedelta(minutes=30) if needs_locking else None
         )
         lock_index = 0
         for i, (slot_request, slot_response) in enumerate(
