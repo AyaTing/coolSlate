@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 from db.database import close_pool, create_pool
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth_router, calendar_router, booking_router, payment_router
+from services.cleanup_service import cleanup_loop, stop_cleanup
+import asyncio
 import httpx
 
 
@@ -11,11 +13,13 @@ async def lifespan(app: FastAPI):
     try:
         app.state.db_pool = await create_pool()
         app.state.http_client = httpx.AsyncClient(timeout=10.0)
+        app.state.cleanup = asyncio.create_task(cleanup_loop(app.state.db_pool))
         yield
     except Exception as e:
         print(f"服務啟動失敗：{e}")
         app.state.db_pool = None
         app.state.http_client = None
+        app.state.cleanup = None
     finally:
         if app.state.db_pool:
             await close_pool(app.state.db_pool)
@@ -23,6 +27,9 @@ async def lifespan(app: FastAPI):
         if app.state.http_client:
             await app.state.http_client.aclose()
             app.state.http_client = None
+        if app.state.cleanup:
+            await stop_cleanup()
+            app.state.cleanup = None
 
 
 app = FastAPI(lifespan=lifespan)
@@ -46,7 +53,7 @@ app.include_router(payment_router.router)
 
 @app.get("/status")
 async def check_status():
-    if not app.state.db_pool or not app.state.http_client:
+    if not app.state.db_pool or not app.state.http_client or not app.state.cleanup:
         raise HTTPException(status_code=500, detail="後端服務無法使用")
     return {"status": "success", "message": "後端服務正常運行"}
 
