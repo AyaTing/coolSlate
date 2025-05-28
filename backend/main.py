@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from db.database import close_pool, create_pool
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth_router, calendar_router, booking_router, payment_router
-from services.cleanup_service import cleanup_loop, stop_cleanup
+from services.cleanup_service import cleanup_loop
 import asyncio
 import httpx
 
@@ -27,9 +27,15 @@ async def lifespan(app: FastAPI):
         if app.state.http_client:
             await app.state.http_client.aclose()
             app.state.http_client = None
-        if app.state.cleanup:
-            await stop_cleanup()
-            app.state.cleanup = None
+        if app.state.cleanup and not app.state.cleanup.done():
+            app.state.cleanup.cancel()
+        try:
+            await app.state.cleanup
+        except asyncio.CancelledError:
+            print("清理服務已成功停止")
+        except Exception as e:
+            print(f"停止清理服務時發生錯誤: {e}")
+        app.state.cleanup = None
 
 
 app = FastAPI(lifespan=lifespan)

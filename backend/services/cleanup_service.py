@@ -7,19 +7,6 @@ from zoneinfo import ZoneInfo
 TAIPEI_TZ = ZoneInfo("Asia/Taipei")
  
 
-async def stop_cleanup(cleanup_task):
-    if cleanup_task and not cleanup_task.done():
-        cleanup_task.cancel()
-        try:
-            await cleanup_task
-        except asyncio.CancelledError:
-            print("清理服務已成功停止") 
-        except Exception as e:
-            print(f"停止清理服務時，發生意外錯誤: {e}") 
-    else:
-        print("清理服務無需停止 (可能未啟動或已完成)。") 
-
-
 async def cleanup_loop(db: asyncpg.Pool):
     while True:
         try:
@@ -31,7 +18,6 @@ async def cleanup_loop(db: asyncpg.Pool):
         except Exception as e:
             await asyncio.sleep(60)
             print(f"清理服務發生意外錯誤: {e}") 
-
 
 
 async def run_cleanup(db: asyncpg.Pool):
