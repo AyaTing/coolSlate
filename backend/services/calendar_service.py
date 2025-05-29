@@ -36,40 +36,32 @@ async def get_available_calendar(
         else:
             to_date = date(display_year, display_month + 1, 1) - timedelta(days=1)
 
-        select_query = "SELECT slot_date, slot_time, available_workers FROM get_available_slots($1, $2, $3, $4)"
-        slots = await db.fetch(
-            select_query,
-            service_type.value,
-            service_info["required_workers"],
-            from_date,
-            to_date,
-        )
-        days_dict = {}
-        for slot in slots:
-            slot_date = slot["slot_date"]
-            slot_time = slot["slot_time"]
-            available_workers = slot["available_workers"]
-            if slot_date is None or slot_time is None or available_workers is None:
-                print(f"跳過無效資料: date={slot_date}, time={slot_time}, workers={available_workers}")
-                continue
-            if slot_date not in days_dict:
-                days_dict[slot_date] = []
-            days_dict[slot_date].append(
-                SlotDetail(
-                    time=slot_time,
-                    available_workers=available_workers,
-                )
-            )
         days = []
         current_date = from_date
         while current_date <= to_date:
-            available_slots = days_dict.get(current_date, [])
-            is_available_for_booking = len(available_slots) > 0
+            is_bookable = await check_date_bookable(
+                current_date, service_type.value, 1, db
+            )
+            available_slots = []
+            if is_bookable:
+                slots = await get_daily_available_slots(
+                    current_date, service_type.value, db
+                )
+                available_slots = []
+                for slot_data in slots:
+                    if slot_data["services"]:
+                        service_info = slot_data["services"][0]
+                        available_slots.append(
+                            SlotDetail(
+                                time=slot_data["time"],
+                                available_workers=service_info["max_units"],
+                            )
+                        )
             days.append(
                 CalendarDay(
                     date=current_date,
                     available_slots=available_slots,
-                    is_available_for_booking=is_available_for_booking,
+                    is_available_for_booking=is_bookable,
                     is_weekend=current_date.weekday() >= 5,
                 )
             )
@@ -101,24 +93,16 @@ async def check_slot_availability(
                 available_workers=0,
                 required_workers=service_info["required_workers"],
             )
-        select_query = "SELECT slot_date, slot_time, available_workers FROM get_available_slots($1, $2, $3, $4)"
-        slots = await db.fetch(
-            select_query,
-            service_type.value,
-            service_info["required_workers"],
-            target_date,
-            target_date,
+        is_available = await check_service_slot_bookable(
+            target_date, target_time, service_type.value, 1, db
         )
-        found_slot = None
-
-        for slot in slots:
-            if slot["slot_date"] == target_date and slot["slot_time"] == target_time:
-                found_slot = slot
-                break
-        if found_slot:
+        if is_available:
+            available_workers = await get_slot_available_workers(
+                target_date, target_time, db
+            )
             return SlotResponse(
                 available=True,
-                available_workers=found_slot["available_workers"],
+                available_workers=available_workers,
                 required_workers=service_info["required_workers"],
             )
         else:
@@ -130,3 +114,275 @@ async def check_slot_availability(
     except Exception as e:
         print(f"出現預期外錯誤，無法確認：{e}")
         raise HTTPException(status_code=500, detail="出現預期外錯誤，無法確認")
+
+
+async def get_daily_available_slots(
+    target_date: date, service_type: str = None, db: asyncpg.Pool = None
+):
+    try:
+        if service_type:
+            service_types = [service_type]
+        else:
+            select_query = "SELECT name FROM service_types ORDER BY priority"
+            services = await db.fetch(select_query)
+            service_types = [service["name"] for service in services]
+        time_slots = [
+            "08:00",
+            "09:00",
+            "10:00",
+            "11:00",
+            "12:00",
+            "13:00",
+            "14:00",
+            "15:00",
+            "16:00",
+        ]
+        result_slots = []
+        for time_str in time_slots:
+            slot_time = datetime.strptime(time_str, "%H:%M").time()
+            services_data = []
+            for svc_type in service_types:
+                is_available = await check_service_slot_bookable(
+                    target_date, slot_time, svc_type, 1, db
+                )
+                if is_available:
+                    max_units = await calculate_service_max_units(
+                        target_date, slot_time, svc_type, db
+                    )
+                    services_data.append(
+                        {
+                            "service_type": svc_type,
+                            "is_available": True,
+                            "max_units": max_units,
+                        }
+                    )
+            if services_data:
+                result_slots.append({"time": slot_time, "services": services_data})
+        return result_slots
+    except Exception as e:
+        print(f"獲取日期可用時段失敗: {e}")
+        raise HTTPException(status_code=500, detail="獲取日期可用時段失敗")
+
+
+async def check_date_bookable(
+    target_date: date, service_type: str, unit_count: int, db: asyncpg.Pool
+):
+    try:
+        select_query = (
+            "SELECT booking_advance_months FROM service_types WHERE name = $1"
+        )
+        service_info = await db.fetchrow(select_query, service_type)
+        if not service_info:
+            return False
+        today = datetime.now(TAIPEI_TZ).date()
+        max_date = today + timedelta(days=service_info["booking_advance_months"] * 30)
+        if target_date <= today or target_date > max_date:
+            return False
+        time_slots = [
+            "08:00",
+            "09:00",
+            "10:00",
+            "11:00",
+            "12:00",
+            "13:00",
+            "14:00",
+            "15:00",
+            "16:00",
+        ]
+        for time_str in time_slots:
+            slot_time = datetime.strptime(time_str, "%H:%M").time()
+            if await check_service_slot_bookable(
+                target_date, slot_time, service_type, unit_count, db
+            ):
+                return True
+        return False
+    except Exception as e:
+        print(f"檢查日期可預約性失敗: {e}")
+        return False
+
+
+async def check_service_slot_bookable(
+    target_date: date,
+    target_time: time,
+    service_type: str,
+    unit_count: int,
+    db: asyncpg.Pool,
+):
+    try:
+        select_query = "SELECT required_workers, base_duration_hours, additional_duration_hours FROM service_types WHERE name = $1"
+        service_info = await db.fetchrow(select_query, service_type)
+        if not service_info:
+            return False
+        if service_type in ["新機安裝", "冷氣保養", "冷氣維修"]:
+            required_hours = (
+                service_info["base_duration_hours"]
+                + (unit_count - 1) * service_info["additional_duration_hours"]
+            )
+        else:
+            return False
+        required_hours = min(required_hours, 8)
+        required_workers = service_info["required_workers"]
+        for hour_offset in range(required_hours):
+            current_time = (
+                datetime.combine(target_date, target_time)
+                + timedelta(hours=hour_offset)
+            ).time()
+            if current_time >= time(17, 0):
+                return False
+            available_workers = await get_slot_available_workers(
+                target_date, current_time, db
+            )
+            if available_workers < required_workers:
+                return False
+        return True
+    except Exception as e:
+        print(f"檢查服務時段可預約性失敗: {e}")
+        return False
+
+
+async def calculate_service_max_units(
+    target_date: date, target_time: time, service_type: str, db: asyncpg.Pool
+):
+    try:
+        select_query = "SELECT required_workers, base_duration_hours, additional_duration_hours FROM service_types WHERE name = $1"
+        service_info = await db.fetchrow(select_query, service_type)
+        if not service_info:
+            return 0
+        max_units = 0
+        for units in range(1, 9):
+            needed_hours = (
+                service_info["base_duration_hours"]
+                + (units - 1) * service_info["additional_duration_hours"]
+            )
+            needed_hours = min(needed_hours, 8)
+            end_time = (
+                datetime.combine(target_date, target_time)
+                + timedelta(hours=needed_hours)
+            ).time()
+            if end_time > time(17, 0):
+                break
+            min_workers = await get_min_workers_in_range(
+                target_date, target_time, needed_hours, db
+            )
+            if min_workers >= service_info["required_workers"]:
+                max_units = units
+            else:
+                break
+        return max_units
+    except Exception as e:
+        print(f"計算服務最大台數失敗: {e}")
+        return 0
+
+
+async def get_min_workers_in_range(
+    target_date: date, start_time: time, hours: int, db: asyncpg.Pool
+):
+    try:
+        min_available = float("inf")  # 初始設為無窮大
+        for hour_offset in range(hours):
+            current_time = (
+                datetime.combine(target_date, start_time) + timedelta(hours=hour_offset)
+            ).time()
+            if current_time >= time(17, 0):
+                return 0
+            available = await get_slot_available_workers(target_date, current_time, db)
+            min_available = min(min_available, available)
+        return min_available if min_available != float("inf") else 0
+    except Exception as e:
+        return 0
+
+
+async def get_slot_available_workers(
+    target_date: date, target_time: time, db: asyncpg.Pool
+):
+    try:
+        available_workers = await db.fetchval(
+            """SELECT (st.total_staff - COALESCE(dwu.used_workers, 0) - COALESCE(locks.locked_workers, 0))
+               FROM staff_config st
+               LEFT JOIN daily_workforce_usage dwu ON dwu.date = $1 AND dwu.time_slot = $2
+               LEFT JOIN (
+                   SELECT slot_date, slot_time, SUM(locked_workers) as locked_workers
+                   FROM time_slot_locks 
+                   WHERE expires_at IS NULL OR expires_at > NOW()
+                   GROUP BY slot_date, slot_time
+               ) locks ON locks.slot_date = $1 AND locks.slot_time = $2
+               ORDER BY st.effective_date DESC LIMIT 1""",
+            target_date,
+            target_time,
+        )
+        return max(0, available_workers or 0)
+    except Exception as e:
+        print(f"獲取時段可用人力失敗: {e}")
+        return 0
+
+
+async def check_booking_feasibility(
+    target_date: date,
+    target_time: time,
+    service_type: str,
+    unit_count: int,
+    db: asyncpg.Pool,
+):
+    try:
+        select_query = "SELECT required_workers, base_duration_hours, additional_duration_hours FROM service_types WHERE name = $1"
+        service_info = await db.fetchrow(select_query, service_type)
+        if not service_info:
+            raise HTTPException(status_code=400, detail="無效的服務類型")
+        if service_type in ["新機安裝", "冷氣保養", "冷氣維修"]:
+            required_hours = (
+                service_info["base_duration_hours"]
+                + (unit_count - 1) * service_info["additional_duration_hours"]
+            )
+        else:
+            raise HTTPException(status_code=400, detail="無對應人力配置")
+        required_hours = min(required_hours, 8)
+        required_workers = service_info["required_workers"]
+        is_bookable = True
+        time_slots_info = []
+        for hour_offset in range(required_hours):
+            current_time = (
+                datetime.combine(target_date, target_time)
+                + timedelta(hours=hour_offset)
+            ).time()
+            if current_time >= time(17, 0):
+                is_bookable = False
+                break
+            available_workers = await get_slot_available_workers(
+                target_date, current_time, db
+            )
+            time_slots_info.append(
+                {
+                    "time": current_time.strftime("%H:%M"),
+                    "available_workers": available_workers,
+                    "required_workers": required_workers,
+                }
+            )
+            if available_workers < required_workers:
+                is_bookable = False
+        end_time = (
+            datetime.combine(target_date, target_time) + timedelta(hours=required_hours)
+        ).time()
+        return {
+            "is_bookable": is_bookable,
+            "service_info": {
+                "service_type": service_type,
+                "unit_count": unit_count,
+                "required_hours": required_hours,
+                "required_workers": required_workers,
+            },
+            "time_slots": time_slots_info,
+            "estimated_end_time": end_time.strftime("%H:%M"),
+        }
+    except Exception as e:
+        print(f"檢查預約可行性失敗: {e}")
+        raise HTTPException(status_code=500, detail="檢查預約可行性失敗")
+
+
+async def get_service_types_config(db: asyncpg.Pool):
+    return await db.fetch(
+        """
+        SELECT name, required_workers, base_duration_hours,
+               additional_duration_hours, booking_advance_months, pricing_type
+        FROM service_types ORDER BY priority
+    """
+    )

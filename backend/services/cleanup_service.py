@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 import asyncio
 import asyncpg
 from zoneinfo import ZoneInfo
@@ -22,11 +22,18 @@ async def cleanup_loop(db: asyncpg.Pool):
 
 async def run_cleanup(db: asyncpg.Pool):
     try:
-        update_query = "UPDATE booking_slots SET is_locked = false, temp_lock_id = NULL, lock_expires_at = NULL WHERE temp_lock_id IS NOT NULL AND temp_lock_id NOT IN (SELECT id FROM time_slot_locks)"
-        await db.execute(update_query,)
         expired_locks = await db.fetchval("SELECT clean_expired_locks()")
         if expired_locks > 0:
             print(f"清理過期鎖定: {expired_locks} 筆")
+        await db.execute("""
+            UPDATE booking_slots 
+            SET is_locked = false, temp_lock_id = NULL, lock_expires_at = NULL 
+            WHERE temp_lock_id IS NOT NULL 
+              AND temp_lock_id NOT IN (
+                  SELECT id FROM time_slot_locks 
+                  WHERE expires_at IS NULL OR expires_at > NOW()
+              )
+        """)
         expired_orders = await find_orders_with_all_slots_expired(db)
         if expired_orders:
             deleted_count = await delete_orders_with_expired_slots(expired_orders, db)
@@ -68,10 +75,30 @@ async def delete_orders_with_expired_slots(expired_orders: list, db):
                     order_id = order["id"]
                     order_number = order["order_number"]
                     service_type = order["service_type"]
-                    select_query = "SELECT unlock_time_slot(temp_lock_id) FROM booking_slots WHERE order_id = $1 AND temp_lock_id IS NOT NULL"
-                    await conn.execute(select_query, order_id)
-                    count_query = "SELECT COUNT(*) FROM booking_slots WHERE order_id = $1"
-                    deleted_slots = await conn.fetchval(count_query, order_id)
+                    slots = await conn.fetch("""
+                        SELECT bs.*, st.base_duration_hours, st.additional_duration_hours
+                        FROM booking_slots bs
+                        JOIN orders o ON bs.order_id = o.id
+                        JOIN service_types st ON o.service_type_id = st.id
+                        WHERE bs.order_id = $1 AND bs.temp_lock_id IS NOT NULL
+                    """, order_id)
+                    for slot in slots:
+                        if slot["temp_lock_id"]:
+                            select_query = "SELECT unit_count FROM orders WHERE id = $1"
+                            unit_count = await conn.fetchval(select_query, order_id)
+                            required_hours = (
+                                slot["base_duration_hours"] 
+                                + (unit_count - 1) * slot["additional_duration_hours"]
+                            )
+                            required_hours = min(required_hours, 8)
+                            select_query = "SELECT unlock_service_time_slot($1, $2, $3, $4)"
+                            await conn.fetchval(
+                                select_query,
+                                slot["temp_lock_id"], slot["preferred_date"], 
+                                slot["preferred_time"], required_hours
+                            )
+                    delete_query = "SELECT COUNT(*) FROM booking_slots WHERE order_id = $1"
+                    deleted_slots = await conn.fetchval(delete_query, order_id)
                     delete_query = "DELETE FROM booking_slots WHERE order_id = $1"
                     await conn.fetchval(delete_query, order_id)
                     delete_query = "DELETE FROM orders WHERE id = $1"

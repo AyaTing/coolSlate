@@ -23,7 +23,7 @@ async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
         async with db.transaction():
             service_type = order_data.service_type.value
             select_query = (
-                "SELECT id, required_workers, name FROM service_types WHERE name = $1"
+                "SELECT id, required_workers, name, base_duration_hours, additional_duration_hours FROM service_types WHERE name = $1"
             )
             service_info = await db.fetchrow(
                 select_query,
@@ -38,6 +38,18 @@ async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
         needs_locking = service_name in ["新機安裝", "冷氣保養"]
         booking_slots_response = []
         temp_locks = []
+
+        for slot in order_data.booking_slots:
+            from services.calendar_service import calculate_service_max_units
+            max_units = await calculate_service_max_units(
+                    slot.preferred_date, slot.preferred_time, service_type, db
+                )
+                
+            if order_data.unit_count > max_units:
+                raise HTTPException(
+                        status_code=400, 
+                        detail=f"時段 {slot.preferred_time.strftime('%H:%M')} 最多只能預約 {max_units} 台"
+                    )
 
         for i, slot in enumerate(order_data.booking_slots):
             slot_response = BookingSlotResponse(
@@ -54,17 +66,20 @@ async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
                 ):
                     slot_response.is_available = False
                 else:
-                    select_query = "SELECT lock_time_slot($1, $2, $3, NULL, 30)"
+                    required_hours = (service_info["base_duration_hours"] + (order_data.unit_count - 1) * service_info["additional_duration_hours"])
+                    required_hours = min(required_hours, 8)
+                    select_query = "SELECT lock_service_time_slot($1, $2, $3, $4, NULL, 30)"
                     lock_id = await db.fetchval(
                         select_query,
                         slot.preferred_date,
                         slot.preferred_time,
                         service_info["required_workers"],
+                        required_hours
                     )
                     if lock_id == -1:
                         slot_response.is_available = False
                     else:
-                        temp_locks.append(lock_id)
+                        temp_locks.append((lock_id, slot.preferred_date, slot.preferred_time))
             else:
                 if not await validate_slot_time(
                     service_name, slot.preferred_date, slot.preferred_time, db
@@ -76,10 +91,11 @@ async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
                 1 for slot in booking_slots_response if slot.is_available
             )
             if available_count == 0:
-                for lock_id in temp_locks:
-                    select_query = "SELECT unlock_time_slot($1)"
-                    await db.fetchval(select_query, lock_id)
-                    raise HTTPException(status_code=409, detail="所選時段都無法預約")
+                for lock_info in temp_locks:
+                    lock_id, slot_date, slot_time = lock_info
+                    select_query = "SELECT unlock_service_time_slot($1, $2, $3, $4)"
+                    await db.fetchval(select_query, lock_id, slot_date, slot_time, required_hours)
+                raise HTTPException(status_code=409, detail="所選時段都無法預約")
         total_amount = await calculate_order_amount(
             service_name,
             order_data.location_address,
@@ -121,7 +137,7 @@ async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
                 and slot_response.is_available
                 and lock_index < len(temp_locks)
             ):
-                temp_lock_id = temp_locks[lock_index]
+                temp_lock_id = temp_locks[lock_index][0]
                 is_locked = True
                 lock_index += 1
 
@@ -148,9 +164,10 @@ async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
             service_type=service_name,
         )
     except Exception as e:
-        for lock_id in temp_locks:
+        for lock_info in temp_locks:
             try:
-                await db.fetchval("SELECT unlock_time_slot($1)", lock_id)
+                lock_id, slot_date, slot_time = lock_info
+                await db.fetchval("SELECT unlock_service_time_slot($1, $2, $3, $4)", lock_id, slot_date, slot_time, required_hours)
             except Exception as unlock_error:
                 print(f"清理鎖定失敗：{unlock_error}")
         print(f"預約失敗：{e}")
@@ -163,9 +180,8 @@ async def validate_slot_time(
     if not (time(8, 0) <= slot_time <= time(16, 0)):
         return False
     try:
-        select_query = "SELECT is_booking_available($1, $2)"
-        is_available = await db.fetchval(select_query, service_type, slot_date)
-        return is_available
+        from services.calendar_service import check_service_slot_bookable
+        return await check_service_slot_bookable(slot_date, slot_time, service_type, 1, db)
     except Exception as e:
         print(f"出現預期外錯誤，無法確認：{e}")
         raise HTTPException(status_code=500, detail="出現預期外錯誤，無法確認")

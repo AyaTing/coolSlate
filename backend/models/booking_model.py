@@ -11,6 +11,7 @@ class OrderStatus(str, Enum):
     SCHEDULED = "scheduled"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+    PENDING_RESCHEDULE = "pending_reschedule"
 
 
 class EquipmentItem(BaseModel):
