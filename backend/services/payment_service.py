@@ -2,19 +2,22 @@ from fastapi import HTTPException
 import stripe
 import os
 from models.payment_model import (
-    PaymentIntentResponse,
     PaymentStatusResponse,
-    PaymentStatus
+    PaymentStatus,
+    CheckoutSessionResponse
 )
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
+TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 load_dotenv()
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 
-async def create_payment_intent(order_id: int, db):
+async def create_checkout_session(order_id: int, db):
     try:
         select_query = "SELECT o.*, st.name as service_type FROM orders o   JOIN service_types st ON o.service_type_id = st.id WHERE o.id = $1"
         order = await db.fetchrow( select_query, order_id,)    
@@ -24,55 +27,75 @@ async def create_payment_intent(order_id: int, db):
             raise HTTPException(status_code=400, detail="訂單狀態錯誤，無法付款")    
         if order["payment_status"] == "paid":
             raise HTTPException(status_code=400, detail="訂單已完成付款")
-        if order['payment_intent_id']:
+        if order["checkout_session_id"]:
             try:
-                existing_intent = stripe.PaymentIntent.retrieve(order["payment_intent_id"])
-                if existing_intent.status in ["requires_payment_method", "requires_confirmation", "requires_action"]:
-                    return PaymentIntentResponse(
-                        client_secret=existing_intent.client_secret,
-                        payment_intent_id=existing_intent.id,
-                        amount=order["total_amount"],
-                        currency="twd",
-                        publishable_key=STRIPE_PUBLISHABLE_KEY
-                        )
-                elif existing_intent.status == 'succeeded':
-                    print(f"訂單{order_id}已完成，狀態未同步")
-                    raise HTTPException(status_code=400, detail=f"訂單{order_id}已完成，狀態未同步")
-            except stripe.error.StripeError as e:
-                print(f"查詢現有 Payment Intent 失敗: {e}")
-        try:
-            intent = stripe.PaymentIntent.create(
-                amount=order["total_amount"] * 100,
-                currency="twd",
-                automatic_payment_methods={"enabled": True},
-                metadata={
-                    "order_id": str(order_id),
-                    "order_number": order['order_number'],
-                    "service_type": order['service_type'],
-                    "user_email": order["user_email"]
+                existing_session = stripe.checkout.Session.retrieve(order["checkout_session_id"])
+                if existing_session.status == 'open':
+                    return CheckoutSessionResponse(
+                        session_id=existing_session.id,
+                        session_url=existing_session.url,
+                        order_id=order_id,
+                        expires_at=datetime.fromtimestamp(existing_session.expires_at, tz=TAIPEI_TZ)
+                    )
+            except stripe.error.StripeError:
+                print("查詢舊有 Checkout Session 出現錯誤")
+
+        description_parts = [f'訂單編號：{order["order_number"]}']
+        if order["service_type"] == "INSTALLATION" and order.get("equipment_details"):
+            import json
+            equipment_list = json.loads(order["equipment_details"])
+            description_parts.append("設備清單：")
+            for item in equipment_list:
+                description_parts.append(f"• {item['name']} ({item['model']}) x{item['quantity']}")
+        elif order["service_type"] in ["MAINTENANCE", "REPAIR"] and order.get("unit_count"):
+            description_parts.append(f"服務台數：{order["unit_count"]} 台")
+        if order.get("location_address"):
+            description_parts.append(f"服務地址：{order["location_address"]}")
+        if order.get("notes"):
+            description_parts.append(f"備註：{order['notes']}")
+        description_text = "\n".join(description_parts)
+
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "twd",
+                    "product_data": {
+                        "name": f"冷氣服務 - {order["service_type"]}",
+                        "description": description_text,
+                    },
+                    "unit_amount": order["total_amount"] * 100,
                 },
-                description=f"冷氣服務預約 - {order['service_type']} - {order['order_number']}",
-                receipt_email=order["user_email"]
-            )
-            update_query = "UPDATE orders SET payment_intent_id = $1, updated_at = NOW() WHERE id = $2"
-            await db.execute(update_query, intent.id, order_id)
-            print(f"成功創建 Payment Intent: {intent.id} for 訂單 {order['order_number']}")
-            return PaymentIntentResponse(
-                    client_secret=intent.client_secret,
-                    payment_intent_id=intent.id,
-                    amount=order["total_amount"],
-                    currency="twd",
-                    publishable_key=STRIPE_PUBLISHABLE_KEY
-            )
-        except stripe.error.StripeError as e:
-            print(f"Stripe 錯誤: {str(e)}")
-            raise HTTPException(status_code=400, detail=f"創建 PaymentIntent 失敗: {str(e)}")
-        except Exception as err:
-            print(f"創建 Payment Intent 時發生錯誤: {str(err)}")
-            raise HTTPException(status_code=500, detail="付款服務暫時無法使用")
+                "quantity": 1,
+            }],
+            mode="payment",
+            success_url=f"https://cool-slate.ayating.workers.dev/payment/success?order_id={order_id}",
+            cancel_url=f"https://cool-slate.ayating.workers.dev/payment/cancel?order_id={order_id}",
+            metadata={
+                "order_id": str(order_id),
+                "order_number": order["order_number"],
+                "service_type": order["service_type"],
+                "user_email": order["user_email"]
+            },
+            customer_email=order['user_email'],
+            expires_at=int((datetime.now(TAIPEI_TZ) + timedelta(hours=1)).timestamp()),
+        )
+        
+        update_query = "UPDATE orders SET checkout_session_id = $1, updated_at = NOW() WHERE id = $2"
+        await db.execute(update_query, checkout_session.id, order_id)
+        print(f"成功創建訂單 {order["order_number"]} 的 Checkout Session: {checkout_session.id}")
+        return CheckoutSessionResponse(
+            session_id=checkout_session.id,
+            session_url=checkout_session.url,
+            order_id=order_id,
+            expires_at=datetime.fromtimestamp(checkout_session.expires_at, tz=TAIPEI_TZ)
+        )
+    except stripe.error.StripeError as e:
+        print(f"Stripe 錯誤: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"創建付款頁面失敗: {str(e)}")
     except Exception as e:
-        print(f"出現預期外錯誤，無法確認：{e}")
-        raise HTTPException(status_code=500, detail="出現預期外錯誤，無法確認")
+        print(f"創建 Checkout Session 時發生錯誤: {str(e)}")
+        raise HTTPException(status_code=500, detail="付款服務暫時無法使用")
 
 async def get_payment_status(order_id: int, db):
     try:
@@ -103,31 +126,28 @@ async def handle_webhook(payload: bytes, sig_header: str, db):
         except stripe.error.SignatureVerificationError:
             print("認證失敗")
             raise HTTPException(status_code=400, detail="認證失敗")
-        event_type = event['type']
-        if event_type == "payment_intent.succeeded":
-            payment_intent = event["data"]["object"]
-            order_id = int(payment_intent["metadata"]["order_id"])
+        event_type = event["type"]
+        if event_type == "checkout.session.completed":
+            session = event["data"]["object"]
+            order_id = int(session["metadata"]["order_id"])
             try:
                 async with db.transaction():
                     update_query = "UPDATE orders SET status = 'paid', payment_status = 'paid', updated_at = NOW() WHERE id = $1 AND payment_status = 'unpaid'"
-                    result = await db.execute(update_query, order_id,)
+                    result = await db.execute(update_query, order_id)
                     if result == "UPDATE 1":
-                        order_number = await db.fetchval(
-                            "SELECT order_number FROM orders WHERE id = $1", order_id
-                        )
+                        select_query = "SELECT order_number FROM orders WHERE id = $1"
+                        order_number = await db.fetchval(select_query, order_id)
                         print(f"訂單 {order_number} 付款成功")
-                        # await trigger_scheduling(order_id)
                         return {"status": "received"}
                     else:
                         print(f"訂單 {order_id} 可能已處理過")
                         return {"status": "received"}
             except Exception as e:
-                print(f"❌ 處理 webhook 事件時發生錯誤: {str(e)}")
+                print(f"處理 webhook 事件時發生錯誤: {str(e)}")
                 return {"status": "error", "message": str(e)}
-        elif event_type == 'payment_intent.payment_failed':
-            order_id = int(event['data']['object']['metadata']['order_id'])
-            print(f"訂單 {order_id} 付款失敗")
-            return {"status": "received"}
         else:
             print(f"收到未處理的事件: {event_type}")
             return {"status": "received"}
+
+
+    

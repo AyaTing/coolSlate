@@ -7,15 +7,15 @@ class PaymentStatus(str, Enum):
     PAID = "paid"
     REFUNDED = "refunded"
 
-class PaymentIntentRequest(BaseModel):
+class CheckoutSessionRequest(BaseModel):
     order_id: int
 
-class PaymentIntentResponse(BaseModel):
-    client_secret: str 
-    payment_intent_id: str
-    amount: int 
-    currency: str = "twd"
-    publishable_key: str
+
+class CheckoutSessionResponse(BaseModel):
+    session_url: str
+    session_id: str
+    order_id: int
+    expires_at: datetime
 
 class PaymentStatusResponse(BaseModel):
     order_id: int
