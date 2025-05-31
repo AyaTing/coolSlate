@@ -8,13 +8,12 @@ from models.booking_model import (
     OrderResponse,
     BookingSlotResponse,
 )
-import asyncpg
 import json
 import uuid
 
 TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 
-async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
+async def create_order_with_lock(order_data: OrderRequest, db):
     if len(order_data.booking_slots) < 1:
         raise HTTPException(status_code=400, detail="至少需要選擇一個預約時段")
     if len(order_data.booking_slots) > 2:
@@ -35,7 +34,7 @@ async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
             )
 
         service_name = service_info["name"]
-        needs_locking = service_name in ["新機安裝", "冷氣保養"]
+        needs_locking = service_name in ["INSTALLATION", "MAINTENANCE"]
         booking_slots_response = []
         temp_locks = []
 
@@ -175,8 +174,7 @@ async def create_order_with_lock(order_data: OrderRequest, db: asyncpg.Pool):
 
 
 async def validate_slot_time(
-    service_type: str, slot_date: date, slot_time: time, db=asyncpg.Pool
-):
+    service_type: str, slot_date: date, slot_time: time, db):
     if not (time(8, 0) <= slot_time <= time(16, 0)):
         return False
     try:

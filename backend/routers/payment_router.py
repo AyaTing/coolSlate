@@ -14,7 +14,7 @@ from services.payment_service import (
 router = APIRouter(prefix="/api", tags=["payment"])
 
 @router.post("/payment/create-intent", response_model=PaymentIntentResponse)
-async def create_payment_intent_endpoint(request: PaymentIntentRequest, db: asyncpg.Pool = Depends(get_connection)):
+async def create_payment_intent_endpoint(request: PaymentIntentRequest, db: asyncpg.Connection = Depends(get_connection)):
     try:
         return await create_payment_intent(request.order_id, db)
     except HTTPException as http_exc:
@@ -25,7 +25,7 @@ async def create_payment_intent_endpoint(request: PaymentIntentRequest, db: asyn
         raise HTTPException(status_code=500, detail="創建 Payment Intent 失敗")
 
 @router.get("/payment/status/{order_id}", response_model=PaymentStatusResponse)
-async def get_payment_status_endpoint(order_id: int, db: asyncpg.Pool = Depends(get_connection)):
+async def get_payment_status_endpoint(order_id: int, db: asyncpg.Connection = Depends(get_connection)):
     try:
         return await get_payment_status(order_id, db)
     except HTTPException as http_exc:
@@ -36,7 +36,7 @@ async def get_payment_status_endpoint(order_id: int, db: asyncpg.Pool = Depends(
         raise HTTPException(status_code=500, detail="查詢付款狀態失敗")
 
 @router.post("/payment/webhook/stripe")
-async def stripe_webhook_endpoint(request: Request, db: asyncpg.Pool = Depends(get_connection)):
+async def stripe_webhook_endpoint(request: Request, db: asyncpg.Connection = Depends(get_connection)):
     try:
         payload = await request.body()
         sig_header = request.headers.get("stripe-signature", "")

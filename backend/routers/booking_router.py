@@ -7,7 +7,7 @@ import asyncpg
 router = APIRouter(prefix="/api", tags=["order"])
 
 @router.post("/order", response_model=OrderResponse)
-async def create_order(order_data: OrderRequest, db: asyncpg.Pool = Depends(get_connection)):
+async def create_order(order_data: OrderRequest, db: asyncpg.Connection = Depends(get_connection)):
     try:
         order_response = await create_order_with_lock(order_data, db)
         return order_response

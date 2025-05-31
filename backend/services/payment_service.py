@@ -1,5 +1,4 @@
 from fastapi import HTTPException
-import asyncpg
 import stripe
 import os
 from models.payment_model import (
@@ -15,7 +14,7 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 
-async def create_payment_intent(order_id: int, db: asyncpg.Pool):
+async def create_payment_intent(order_id: int, db):
     try:
         select_query = "SELECT o.*, st.name as service_type FROM orders o   JOIN service_types st ON o.service_type_id = st.id WHERE o.id = $1"
         order = await db.fetchrow( select_query, order_id,)    
@@ -75,7 +74,7 @@ async def create_payment_intent(order_id: int, db: asyncpg.Pool):
         print(f"出現預期外錯誤，無法確認：{e}")
         raise HTTPException(status_code=500, detail="出現預期外錯誤，無法確認")
 
-async def get_payment_status(order_id: int, db: asyncpg.Pool):
+async def get_payment_status(order_id: int, db):
     try:
         select_query = "SELECT o.*, st.name as service_type FROM orders o   JOIN service_types st ON o.service_type_id = st.id WHERE o.id = $1"
         order = await db.fetchrow(select_query, order_id)            
@@ -95,7 +94,7 @@ async def get_payment_status(order_id: int, db: asyncpg.Pool):
         print(f"出現預期外錯誤，無法確認：{e}")
         raise HTTPException(status_code=500, detail="出現預期外錯誤，無法確認")
 
-async def handle_webhook(payload: bytes, sig_header: str, db: asyncpg.Pool):
+async def handle_webhook(payload: bytes, sig_header: str, db):
         try:
             event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
         except ValueError:

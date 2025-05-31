@@ -1,13 +1,12 @@
 from fastapi import HTTPException
 import asyncio
-import asyncpg
 from zoneinfo import ZoneInfo
 
 
 TAIPEI_TZ = ZoneInfo("Asia/Taipei")
  
 
-async def cleanup_loop(db: asyncpg.Pool):
+async def cleanup_loop(db):
     while True:
         try:
             await run_cleanup(db)
@@ -20,7 +19,7 @@ async def cleanup_loop(db: asyncpg.Pool):
             print(f"清理服務發生意外錯誤: {e}") 
 
 
-async def run_cleanup(db: asyncpg.Pool):
+async def run_cleanup(db):
     try:
         expired_locks = await db.fetchval("SELECT clean_expired_locks()")
         if expired_locks > 0:
@@ -53,7 +52,7 @@ async def find_orders_with_all_slots_expired(db):
             JOIN service_types st ON o.service_type_id = st.id               
             WHERE o.status = 'pending' 
               AND o.payment_status = 'unpaid'
-              AND st.name IN ('新機安裝', '冷氣保養')
+              AND st.name IN ('INSTALLATION', 'MAINTENANCE')
               AND EXISTS (
                   SELECT 1 FROM booking_slots bs 
                   WHERE bs.order_id = o.id
@@ -118,7 +117,7 @@ async def delete_unpaid_repair_orders(db):
             JOIN service_types st ON o.service_type_id = st.id
             WHERE o.status = 'pending' 
               AND o.payment_status = 'unpaid'
-              AND st.name = '冷氣維修'
+              AND st.name = 'REPAIR'
               AND o.created_at < NOW() - INTERVAL '30 minutes'
         """)
     if not expired_repair_orders:

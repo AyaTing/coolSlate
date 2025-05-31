@@ -1,7 +1,6 @@
 from fastapi import HTTPException
 from datetime import datetime, date, time, timedelta
 from zoneinfo import ZoneInfo
-import asyncpg
 from models.service_model import ServiceType
 from models.calendar_model import (
     CalendarResponse,
@@ -17,7 +16,7 @@ async def get_available_calendar(
     service_type: ServiceType,
     year: int = None,
     month: int = None,
-    db: asyncpg.Pool = None,
+    db = None,
 ):
     try:
         select_query = "SELECT required_workers, booking_advance_months FROM service_types WHERE name = $1"
@@ -79,7 +78,7 @@ async def get_available_calendar(
 
 
 async def check_slot_availability(
-    service_type: ServiceType, target_date: date, target_time: time, db: asyncpg.Pool
+    service_type: ServiceType, target_date: date, target_time: time, db
 ):
     try:
         select_query = "SELECT required_workers FROM service_types WHERE name = $1"
@@ -117,7 +116,7 @@ async def check_slot_availability(
 
 
 async def get_daily_available_slots(
-    target_date: date, service_type: str = None, db: asyncpg.Pool = None
+    target_date: date, service_type: str = None, db = None
 ):
     try:
         if service_type:
@@ -165,7 +164,7 @@ async def get_daily_available_slots(
 
 
 async def check_date_bookable(
-    target_date: date, service_type: str, unit_count: int, db: asyncpg.Pool
+    target_date: date, service_type: str, unit_count: int, db
 ):
     try:
         select_query = (
@@ -206,14 +205,14 @@ async def check_service_slot_bookable(
     target_time: time,
     service_type: str,
     unit_count: int,
-    db: asyncpg.Pool,
+    db
 ):
     try:
         select_query = "SELECT required_workers, base_duration_hours, additional_duration_hours FROM service_types WHERE name = $1"
         service_info = await db.fetchrow(select_query, service_type)
         if not service_info:
             return False
-        if service_type in ["新機安裝", "冷氣保養", "冷氣維修"]:
+        if service_type in ["INSTALLATION", "MAINTENANCE", "REPAIR"]:
             required_hours = (
                 service_info["base_duration_hours"]
                 + (unit_count - 1) * service_info["additional_duration_hours"]
@@ -241,7 +240,7 @@ async def check_service_slot_bookable(
 
 
 async def calculate_service_max_units(
-    target_date: date, target_time: time, service_type: str, db: asyncpg.Pool
+    target_date: date, target_time: time, service_type: str, db
 ):
     try:
         select_query = "SELECT required_workers, base_duration_hours, additional_duration_hours FROM service_types WHERE name = $1"
@@ -275,7 +274,7 @@ async def calculate_service_max_units(
 
 
 async def get_min_workers_in_range(
-    target_date: date, start_time: time, hours: int, db: asyncpg.Pool
+    target_date: date, start_time: time, hours: int, db
 ):
     try:
         min_available = float("inf")  # 初始設為無窮大
@@ -293,7 +292,7 @@ async def get_min_workers_in_range(
 
 
 async def get_slot_available_workers(
-    target_date: date, target_time: time, db: asyncpg.Pool
+    target_date: date, target_time: time, db
 ):
     try:
         available_workers = await db.fetchval(
@@ -321,14 +320,14 @@ async def check_booking_feasibility(
     target_time: time,
     service_type: str,
     unit_count: int,
-    db: asyncpg.Pool,
+    db
 ):
     try:
         select_query = "SELECT required_workers, base_duration_hours, additional_duration_hours FROM service_types WHERE name = $1"
         service_info = await db.fetchrow(select_query, service_type)
         if not service_info:
             raise HTTPException(status_code=400, detail="無效的服務類型")
-        if service_type in ["新機安裝", "冷氣保養", "冷氣維修"]:
+        if service_type in ["INSTALLATION", "MAINTENANCE", "REPAIR"]:
             required_hours = (
                 service_info["base_duration_hours"]
                 + (unit_count - 1) * service_info["additional_duration_hours"]
@@ -378,7 +377,7 @@ async def check_booking_feasibility(
         raise HTTPException(status_code=500, detail="檢查預約可行性失敗")
 
 
-async def get_service_types_config(db: asyncpg.Pool):
+async def get_service_types_config(db):
     return await db.fetch(
         """
         SELECT name, required_workers, base_duration_hours,

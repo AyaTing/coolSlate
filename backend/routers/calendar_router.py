@@ -11,30 +11,31 @@ from zoneinfo import ZoneInfo
 router = APIRouter(prefix="/api", tags=["calendar"])
 TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 
-@router.get("/calendar/{service_type}", response_model=CalendarResponse)
-async def get_service_calendar(
-    service_type: ServiceType,
-    year: Optional[int] = None,
-    month: Optional[int] = None,
-    db: asyncpg.Pool = Depends(get_connection),
-):
+@router.get("/calendar/service")
+async def get_service_types_info(db: asyncpg.Connection = Depends(get_connection)):
     try:
-        available_calendar = await get_available_calendar(service_type, year, month, db)
-        return available_calendar
-    except HTTPException as http_exc:
-        print(f"{http_exc.status_code} - {http_exc.detail}")
-        raise http_exc
+        services = await get_service_types_config(db)
+        return [
+            {
+                "name": service["name"],
+                "required_workers": service["required_workers"],
+                "base_duration_hours": service["base_duration_hours"],
+                "additional_duration_hours": service["additional_duration_hours"],
+                "booking_advance_months": service["booking_advance_months"],
+                "pricing_type": service["pricing_type"]
+            }
+            for service in services
+        ]
     except Exception as e:
-        print(f"出現預期外錯誤，取得日曆失敗：{e}")
-        raise HTTPException(status_code=500, detail="出現預期外錯誤，取得日曆失敗")
-
+        print(f"獲取服務類型資訊失敗: {e}")
+        raise HTTPException(status_code=500, detail="獲取服務類型資訊失敗")
 
 @router.get("/calendar/slots/")
 async def check_service_slot(
     service_type: ServiceType,
     target_date: date,
     target_time: time,
-    db: asyncpg.Pool = Depends(get_connection),
+    db: asyncpg.Connection = Depends(get_connection),
 ):
     try:
         check_result = await check_slot_availability(
@@ -52,7 +53,7 @@ async def check_service_slot(
 async def get_daily_availability(
     target_date: date,
     service_type: Optional[ServiceType] = None,
-    db: asyncpg.Pool = Depends(get_connection),
+    db: asyncpg.Connection = Depends(get_connection),
 ):
     try:
         service_filter = service_type.value if service_type else None
@@ -78,7 +79,7 @@ async def check_booking_endpoint(
     target_time: time,
     service_type: ServiceType,
     unit_count: int,
-    db: asyncpg.Pool = Depends(get_connection),
+    db: asyncpg.Connection = Depends(get_connection),
 ):
     try:
         result = await check_booking_feasibility(
@@ -93,31 +94,12 @@ async def check_booking_endpoint(
         raise HTTPException(status_code=500, detail="檢查預約可行性失敗")
 
 
-@router.get("/calendar/service-types")
-async def get_service_types_info(db: asyncpg.Pool = Depends(get_connection)):
-    try:
-        services = await get_service_types_config(db)
-        return [
-            {
-                "name": service["name"],
-                "required_workers": service["required_workers"],
-                "base_duration_hours": service["base_duration_hours"],
-                "additional_duration_hours": service["additional_duration_hours"],
-                "booking_advance_months": service["booking_advance_months"],
-                "pricing_type": service["pricing_type"]
-            }
-            for service in services
-        ]
-    except Exception as e:
-        print(f"獲取服務類型資訊失敗: {e}")
-        raise HTTPException(status_code=500, detail="獲取服務類型資訊失敗")
-
     
 @router.post("/calendar/check-dates")
 async def check_multiple_dates_availability(
     dates: list[date],
     service_type: ServiceType,
-    db: asyncpg.Pool = Depends(get_connection),
+    db: asyncpg.Connection = Depends(get_connection),
 ):
     try:
         if len(dates) > 31:
@@ -140,7 +122,7 @@ async def check_multiple_dates_availability(
 async def get_unified_calendar(
     year: Optional[int] = None,
     month: Optional[int] = None,
-    db: asyncpg.Pool = Depends(get_connection),
+    db: asyncpg.Connection = Depends(get_connection),
 ):
     try:
         today = datetime.now(TAIPEI_TZ).date()
@@ -178,7 +160,7 @@ async def check_units_dynamic(
     target_time: time,
     service_type: ServiceType,
     unit_count: int,
-    db: asyncpg.Pool = Depends(get_connection),
+    db: asyncpg.Connection = Depends(get_connection),
 ):
     try:
         from services.calendar_service import check_service_slot_bookable
@@ -196,3 +178,21 @@ async def check_units_dynamic(
     except Exception as e:
         print(f"檢查台數失敗: {e}")
         raise HTTPException(status_code=500, detail="檢查台數失敗")
+
+
+@router.get("/calendar/{service_type}", response_model=CalendarResponse)
+async def get_service_calendar(
+    service_type: ServiceType,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    db: asyncpg.Connection = Depends(get_connection),
+):
+    try:
+        available_calendar = await get_available_calendar(service_type, year, month, db)
+        return available_calendar
+    except HTTPException as http_exc:
+        print(f"{http_exc.status_code} - {http_exc.detail}")
+        raise http_exc
+    except Exception as e:
+        print(f"出現預期外錯誤，取得日曆失敗：{e}")
+        raise HTTPException(status_code=500, detail="出現預期外錯誤，取得日曆失敗")
