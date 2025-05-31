@@ -247,22 +247,25 @@ async def calculate_service_max_units(
         if not service_info:
             return 0
         max_units = 0
-        for units in range(1, 9):
-            needed_hours = (
-            service_info["base_duration_hours"]
-            + (units - 1) * service_info["additional_duration_hours"]
-        )
-            needed_hours = min(needed_hours, 8)
+        available_hours_in_day_from_start = 17 - target_time.hour
+        if target_time.minute > 0:
+            available_hours_in_day_from_start -= 1
 
-            end_time = (
+        for units in range(1, 9):
+            needed_hours_unlimited = (
+                service_info["base_duration_hours"]
+                + (units - 1) * service_info["additional_duration_hours"]
+            )
+            potential_end_time = (
                 datetime.combine(target_date, target_time)
-                + timedelta(hours=needed_hours)
+                + timedelta(hours=needed_hours_unlimited)
             ).time()
 
-            if end_time > time(17, 0):
+            if potential_end_time > time(17, 0):
                 break
+            needed_hours_capped = min(needed_hours_unlimited, 8)
             min_workers = await get_min_workers_in_range(
-                target_date, target_time, needed_hours, db
+                target_date, target_time, needed_hours_capped, db
             )
 
             if min_workers >= service_info["required_workers"]:
