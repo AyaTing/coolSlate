@@ -16,7 +16,7 @@ async def get_available_calendar(
     service_type: ServiceType,
     year: int = None,
     month: int = None,
-    db = None,
+    db=None,
 ):
     try:
         select_query = "SELECT required_workers, booking_advance_months FROM service_types WHERE name = $1"
@@ -49,11 +49,16 @@ async def get_available_calendar(
                 available_slots = []
                 for slot_data in slots:
                     if slot_data["services"]:
-                        service_info = slot_data["services"][0]
+                        current_slot_time = slot_data["time"]
+                        real_available_workers = await get_slot_available_workers(
+                            current_date,
+                            current_slot_time,
+                            db
+                        )
                         available_slots.append(
                             SlotDetail(
                                 time=slot_data["time"],
-                                available_workers=service_info["max_units"],
+                                available_workers=real_available_workers,
                             )
                         )
             days.append(
@@ -116,7 +121,7 @@ async def check_slot_availability(
 
 
 async def get_daily_available_slots(
-    target_date: date, service_type: str = None, db = None
+    target_date: date, service_type: str = None, db=None
 ):
     try:
         if service_type:
@@ -201,26 +206,20 @@ async def check_date_bookable(
 
 
 async def check_service_slot_bookable(
-    target_date: date,
-    target_time: time,
-    service_type: str,
-    unit_count: int,
-    db
+    target_date: date, target_time: time, service_type: str, unit_count: int, db
 ):
     try:
         select_query = "SELECT required_workers, base_duration_hours, additional_duration_hours FROM service_types WHERE name = $1"
         service_info = await db.fetchrow(select_query, service_type)
         if not service_info:
             return False
-        if service_type in ["INSTALLATION", "MAINTENANCE", "REPAIR"]:
-            required_hours = (
-                service_info["base_duration_hours"]
-                + (unit_count - 1) * service_info["additional_duration_hours"]
-            )
-        else:
-            return False
+        required_hours = (
+            service_info["base_duration_hours"]
+            + (unit_count - 1) * service_info["additional_duration_hours"]
+        )
         required_hours = min(required_hours, 8)
         required_workers = service_info["required_workers"]
+
         for hour_offset in range(required_hours):
             current_time = (
                 datetime.combine(target_date, target_time)
@@ -250,19 +249,22 @@ async def calculate_service_max_units(
         max_units = 0
         for units in range(1, 9):
             needed_hours = (
-                service_info["base_duration_hours"]
-                + (units - 1) * service_info["additional_duration_hours"]
-            )
+            service_info["base_duration_hours"]
+            + (units - 1) * service_info["additional_duration_hours"]
+        )
             needed_hours = min(needed_hours, 8)
+
             end_time = (
                 datetime.combine(target_date, target_time)
                 + timedelta(hours=needed_hours)
             ).time()
+
             if end_time > time(17, 0):
                 break
             min_workers = await get_min_workers_in_range(
                 target_date, target_time, needed_hours, db
             )
+
             if min_workers >= service_info["required_workers"]:
                 max_units = units
             else:
@@ -273,9 +275,7 @@ async def calculate_service_max_units(
         return 0
 
 
-async def get_min_workers_in_range(
-    target_date: date, start_time: time, hours: int, db
-):
+async def get_min_workers_in_range(target_date: date, start_time: time, hours: int, db):
     try:
         min_available = float("inf")  # 初始設為無窮大
         for hour_offset in range(hours):
@@ -284,56 +284,44 @@ async def get_min_workers_in_range(
             ).time()
             if current_time >= time(17, 0):
                 return 0
+
             available = await get_slot_available_workers(target_date, current_time, db)
             min_available = min(min_available, available)
         return min_available if min_available != float("inf") else 0
     except Exception as e:
+        print(f"取得時間範圍內最小人力失敗: {e}")
         return 0
 
 
-async def get_slot_available_workers(
-    target_date: date, target_time: time, db
-):
+async def get_slot_available_workers(target_date: date, target_time: time, db):
     try:
+        select_query = "SELECT get_real_available_workers($1, $2)"
+        # select_query = "SELECT available_workers FROM available_time_slots WHERE slot_date = $1 AND slot_time = $2"
         available_workers = await db.fetchval(
-            """SELECT (st.total_staff - COALESCE(dwu.used_workers, 0) - COALESCE(locks.locked_workers, 0))
-               FROM staff_config st
-               LEFT JOIN daily_workforce_usage dwu ON dwu.date = $1 AND dwu.time_slot = $2
-               LEFT JOIN (
-                   SELECT slot_date, slot_time, SUM(locked_workers) as locked_workers
-                   FROM time_slot_locks 
-                   WHERE expires_at IS NULL OR expires_at > NOW()
-                   GROUP BY slot_date, slot_time
-               ) locks ON locks.slot_date = $1 AND locks.slot_time = $2
-               ORDER BY st.effective_date DESC LIMIT 1""",
+            select_query,
             target_date,
             target_time,
         )
-        return max(0, available_workers or 0)
+        if available_workers is None:
+            return 0
+        return max(0, available_workers)
     except Exception as e:
         print(f"獲取時段可用人力失敗: {e}")
         return 0
 
 
 async def check_booking_feasibility(
-    target_date: date,
-    target_time: time,
-    service_type: str,
-    unit_count: int,
-    db
+    target_date: date, target_time: time, service_type: str, unit_count: int, db
 ):
     try:
         select_query = "SELECT required_workers, base_duration_hours, additional_duration_hours FROM service_types WHERE name = $1"
         service_info = await db.fetchrow(select_query, service_type)
         if not service_info:
             raise HTTPException(status_code=400, detail="無效的服務類型")
-        if service_type in ["INSTALLATION", "MAINTENANCE", "REPAIR"]:
-            required_hours = (
-                service_info["base_duration_hours"]
-                + (unit_count - 1) * service_info["additional_duration_hours"]
-            )
-        else:
-            raise HTTPException(status_code=400, detail="無對應人力配置")
+        required_hours = (
+            service_info["base_duration_hours"]
+            + (unit_count - 1) * service_info["additional_duration_hours"]
+        )
         required_hours = min(required_hours, 8)
         required_workers = service_info["required_workers"]
         is_bookable = True

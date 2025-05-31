@@ -20,6 +20,8 @@ async def create_order_with_lock(order_data: OrderRequest, db):
         raise HTTPException(status_code=400, detail="最多只能選擇兩個預約時段")
     try:
         async with db.transaction():
+            required_hours = 2
+            temp_locks = []
             service_type = order_data.service_type.value
             select_query = (
                 "SELECT id, required_workers, name, base_duration_hours, additional_duration_hours FROM service_types WHERE name = $1"
@@ -36,7 +38,12 @@ async def create_order_with_lock(order_data: OrderRequest, db):
         service_name = service_info["name"]
         needs_locking = service_name in ["INSTALLATION", "MAINTENANCE"]
         booking_slots_response = []
-        temp_locks = []
+        required_hours = (
+            service_info["base_duration_hours"]
+            + (order_data.unit_count - 1) * service_info["additional_duration_hours"]
+        )
+        required_hours = min(required_hours, 8)
+
 
         for slot in order_data.booking_slots:
             from services.calendar_service import calculate_service_max_units
@@ -65,8 +72,6 @@ async def create_order_with_lock(order_data: OrderRequest, db):
                 ):
                     slot_response.is_available = False
                 else:
-                    required_hours = (service_info["base_duration_hours"] + (order_data.unit_count - 1) * service_info["additional_duration_hours"])
-                    required_hours = min(required_hours, 8)
                     select_query = "SELECT lock_service_time_slot($1, $2, $3, $4, NULL, 30)"
                     lock_id = await db.fetchval(
                         select_query,
