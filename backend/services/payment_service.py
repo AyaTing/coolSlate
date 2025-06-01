@@ -132,12 +132,21 @@ async def handle_webhook(payload: bytes, sig_header: str, db):
             order_id = int(session["metadata"]["order_id"])
             try:
                 async with db.transaction():
-                    update_query = "UPDATE orders SET status = 'paid', payment_status = 'paid', updated_at = NOW() WHERE id = $1 AND payment_status = 'unpaid'"
-                    result = await db.execute(update_query, order_id)
+                    select_query = "SELECT o.*, st.name as service_type, st.required_workers, st.base_duration_hours, st.additional_duration_hours FROM orders o    JOIN service_types st ON o.service_type_id = st.id WHERE o.id = $1"
+                    order_info = await db.fetchrow(select_query, order_id)
+                    if not order_info:
+                        print(f"訂單 {order_id} 不存在")
+                        return {"status": "error", "message": "訂單不存在"}
+                    stripe_amount = session["amount_total"]
+                    expected_amount = order_info["total_amount"] * 100
+                    if stripe_amount != expected_amount:
+                        print(f"訂單 {order_info['order_number']} 金額不符，實付={stripe_amount/100}，應付={order_info['total_amount']}")
+                        return {"status": "error", "message": "付款金額與訂單金額不符"}
+                    update_query = "UPDATE orders SET status = 'paid', payment_status = 'paid', updated_at = NOW(), checkout_session_id = $2 WHERE id = $1 AND payment_status = 'unpaid'"
+                    result = await db.execute(update_query, order_id, session['id'])
                     if result == "UPDATE 1":
-                        select_query = "SELECT order_number FROM orders WHERE id = $1"
-                        order_number = await db.fetchval(select_query, order_id)
-                        print(f"訂單 {order_number} 付款成功")
+                        await extend_booking_locks(order_id, db)
+                        print(f"✅ 訂單 {order_info['order_number']} 付款成功，已延長鎖定時間")
                         return {"status": "received"}
                     else:
                         print(f"訂單 {order_id} 可能已處理過")
@@ -150,4 +159,15 @@ async def handle_webhook(payload: bytes, sig_header: str, db):
             return {"status": "received"}
 
 
-    
+async def extend_booking_locks(order_id, db):
+    try:
+        new_expires_at = datetime.now(TAIPEI_TZ) + timedelta(days=7)
+        update_query = "UPDATE time_slot_locks SET expires_at = $1 WHERE id IN ( SELECT bs.temp_lock_id FROM booking_slots bs WHERE bs.order_id = $2  AND bs.temp_lock_id IS NOT NULL )"
+        await db.execute(update_query, new_expires_at, order_id)
+        update_query = "UPDATE booking_slots SET lock_expires_at = $1 WHERE order_id = $2"
+        await db.execute(update_query, new_expires_at, order_id)
+        print(f"已延長訂單 {order_id} 的鎖定到 {new_expires_at}")  
+    except Exception as e:
+        print(f"延長鎖定失敗: {e}")
+
+
