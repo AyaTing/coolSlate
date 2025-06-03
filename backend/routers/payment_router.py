@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 import asyncpg
 from utils.dependencies import get_connection
+from utils.auth import require_auth, verify_order_ownership
 from models.payment_model import (
     PaymentStatusResponse,
     CheckoutSessionRequest,
@@ -10,13 +11,13 @@ from services.payment_service import (
     create_checkout_session,
     get_payment_status,
     handle_webhook,
-
 )
 router = APIRouter(prefix="/api", tags=["payment"])
     
 @router.post("/payment/create-checkout-session", response_model=CheckoutSessionResponse)
-async def create_checkout_session_endpoint(request: CheckoutSessionRequest, db: asyncpg.Connection = Depends(get_connection)):
+async def create_checkout_session_endpoint(request: CheckoutSessionRequest,current_user: dict = Depends(require_auth), db: asyncpg.Connection = Depends(get_connection)):
     try:
+        await verify_order_ownership(request.order_id, current_user["id"], db)
         return await create_checkout_session(request.order_id, db)
     except HTTPException as http_exc:
         print(f"{http_exc.status_code} - {http_exc.detail}")
@@ -27,8 +28,9 @@ async def create_checkout_session_endpoint(request: CheckoutSessionRequest, db: 
 
 
 @router.get("/payment/status/{order_id}", response_model=PaymentStatusResponse)
-async def get_payment_status_endpoint(order_id: int, db: asyncpg.Connection = Depends(get_connection)):
+async def get_payment_status_endpoint(order_id: int, current_user: dict = Depends(require_auth), db: asyncpg.Connection = Depends(get_connection)):
     try:
+        await verify_order_ownership(order_id, current_user["id"], db)
         return await get_payment_status(order_id, db)
     except HTTPException as http_exc:
         print(f"{http_exc.status_code} - {http_exc.detail}")

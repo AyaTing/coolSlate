@@ -7,6 +7,7 @@ from models.booking_model import (
     OrderStatus,
     OrderResponse,
     BookingSlotResponse,
+    OrderDetail
 )
 import json
 import uuid
@@ -113,11 +114,11 @@ async def create_order_with_lock(order_data: OrderRequest, db):
             equipment_json = json.dumps(
                 [item.dict() for item in order_data.equipment_details]
             )
-        insert_query = "INSERT INTO orders (order_number, user_email, service_type_id, location_address, location_lat, location_lng, unit_count, total_amount, equipment_details, notes, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending') RETURNING id"
+        insert_query = "INSERT INTO orders (order_number, user_id, service_type_id, location_address, location_lat, location_lng, unit_count, total_amount, equipment_details, notes, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending') RETURNING id"
         order_id = await db.fetchval(
             insert_query,
             order_number,
-            order_data.user_email,
+            order_data.user_id,
             service_info["id"],
             order_data.location_address,
             order_data.location_lat,
@@ -246,3 +247,36 @@ def determine_region(address: str):
     if any(keyword in address for keyword in keywords):
         return "雙北"
     return "其他地區"
+
+async def get_user_orders_service(user_id, db):
+    try: 
+        select_query = "SELECT o.*, st.name as service_type FROM orders o JOIN service_types st ON o.service_type_id = st.id WHERE o.user_id = $1 ORDER BY o.created_at DESC"
+        orders = await db.fetch(select_query, user_id)
+        result = []
+        for order in orders:
+            select_query = "SELECT preferred_date, preferred_time, contact_name, contact_phone, is_primary, is_selected FROM booking_slots WHERE order_id = $1 ORDER BY is_primary DESC, preferred_date, preferred_time"
+            slots = await db.fetch(select_query, order["id"])
+            order_dict = dict(order)
+            order_dict["order_id"] = order_dict["id"]
+            order_dict["booking_slots"] = [dict(slot) for slot in slots]
+            result.append(OrderDetail(**order_dict))
+        return result
+    except Exception as e:
+        print(f"出現預期外錯誤，無法確認：{e}")
+        raise HTTPException(status_code=500, detail="出現預期外錯誤，無法確認")
+
+async def get_order_detail_service(order_id: int, db):
+    try: 
+        select_query = "SELECT o.*, st.name as service_type FROM orders o JOIN service_types st ON o.service_type_id = st.id WHERE o.id = $1"
+        order = await db.fetchrow(select_query, order_id)
+        if not order:
+            raise HTTPException(status_code=404, detail="訂單不存在")
+        select_query = "SELECT preferred_date, preferred_time, contact_name, contact_phone, is_primary, is_selected FROM booking_slots WHERE order_id = $1 ORDER BY is_primary DESC, preferred_date, preferred_time"
+        slots = await db.fetch(select_query, order_id)
+        order_dict = dict(order)
+        order_dict["order_id"] = order_dict["id"]
+        order_dict["booking_slots"] = [dict(slot) for slot in slots]
+        return OrderDetail(**order_dict)
+    except Exception as e:
+        print(f"出現預期外錯誤，無法確認：{e}")
+        raise HTTPException(status_code=500, detail="出現預期外錯誤，無法確認")

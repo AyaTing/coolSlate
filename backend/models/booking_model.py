@@ -29,7 +29,6 @@ class BookingSlotRequest(BaseModel):
 
 
 class OrderRequest(BaseModel):
-    user_email: EmailStr
     service_type: ServiceType
     location_address: str
     location_lat: Optional[float] = None
@@ -38,6 +37,7 @@ class OrderRequest(BaseModel):
     equipment_details: Optional[List[EquipmentItem]] = None
     notes: Optional[str] = None
     booking_slots: List[BookingSlotRequest]= Field(..., min_items=1, max_items=2)
+    user_id: Optional[int] = None
     
 
 class BookingSlotResponse(BaseModel):
@@ -60,7 +60,7 @@ class OrderResponse(BaseModel):
 class OrderDetail(BaseModel):
     order_id: int
     order_number: str
-    user_email: str
+    user_id: int
     service_type: str
     location_address: str
     location_lat: Optional[float] = None
