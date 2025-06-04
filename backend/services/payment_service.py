@@ -97,7 +97,7 @@ async def create_checkout_session(order_id: int, db):
         print(f"創建 Checkout Session 時發生錯誤: {str(e)}")
         raise HTTPException(status_code=500, detail="付款服務暫時無法使用")
 
-async def get_payment_status(order_id: int, user_email, db):
+async def get_payment_status(order_id: int, db):
     try:
         select_query = "SELECT o.*, st.name as service_type FROM orders o   JOIN service_types st ON o.service_type_id = st.id WHERE o.id = $1"
         order = await db.fetchrow(select_query, order_id)            

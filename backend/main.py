@@ -41,7 +41,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 origins = [
-    "http://localhost:5174","https://cool-slate.ayating.workers.dev",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "https://cool-slate.ayating.workers.dev",
 ]
 
 app.add_middleware(
@@ -56,6 +58,7 @@ app.include_router(auth_router.router)
 app.include_router(calendar_router.router)
 app.include_router(booking_router.router)
 app.include_router(payment_router.router)
+
 
 @app.get("/status")
 async def check_status():

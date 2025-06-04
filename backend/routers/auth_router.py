@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Body 
 from utils.dependencies import get_connection
 from utils.auth import require_auth, require_admin
 from services.auth_service import google_login_service
@@ -9,9 +9,9 @@ import asyncpg
 router = APIRouter(prefix="/api", tags=["auth"])
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request: Request, db: asyncpg.Connection = Depends(get_connection)):
+async def login(id_token: str = Body(...), db: asyncpg.Connection = Depends(get_connection)):
     try:
-        return await google_login_service(request["id_token"], db)
+        return await google_login_service(id_token, db)
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
