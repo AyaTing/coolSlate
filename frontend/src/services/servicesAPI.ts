@@ -1,4 +1,3 @@
-// 🎯 英文服務類型版本 - 完整 servicesAPI.ts
 import { QueryClient } from "@tanstack/react-query";
 
 export const queryClient = new QueryClient({
@@ -150,8 +149,11 @@ function toFrontendServiceType(backendType: string): string {
   return mapped;
 }
 
-// 🔧 通用 API 呼叫函數
-async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
+async function apiCall<T>(
+  endpoint: string,
+  options?: RequestInit,
+  requireAuth = false
+): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -159,11 +161,13 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
     ...((options?.headers as Record<string, string>) || {}),
   };
 
-  const token = localStorage.getItem("auth_token");
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  } else {
-    throw new Error("找不到認證 token，請重新登入");
+  if (requireAuth) {
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    } else {
+      throw new Error("找不到認證 token，請重新登入");
+    }
   }
 
   try {
@@ -173,19 +177,17 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
       credentials: "omit", // 不使用 cookies
     });
 
-    console.log(`📡 Response Status: ${response.status}`);
-
     if (!response.ok) {
       let errorMessage = `HTTP ${response.status}`;
 
       try {
         const errorText = await response.text();
-        console.error(`❌ Error Response:`, errorText);
+        console.error(`Error Response:`, errorText);
 
         const errorData = JSON.parse(errorText);
         errorMessage = errorData.detail || errorData.message || errorText;
       } catch (parseError) {
-        console.error("❌ 無法解析錯誤:", parseError);
+        console.error("無法解析錯誤:", parseError);
       }
 
       throw new Error(errorMessage);
@@ -194,7 +196,7 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error(`❌ API Failed:`, error);
+    console.error(`API Failed:`, error);
 
     if (error instanceof TypeError && error.message.includes("fetch")) {
       throw new Error("網路連線失敗");
@@ -205,7 +207,7 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
 }
 
 export const getServiceTypes = async (): Promise<ServiceTypeInfo[]> => {
-  const data = await apiCall<ServiceTypeInfo[]>("/calendar/service");
+  const data = await apiCall<ServiceTypeInfo[]>("/calendar/service", {}, false);
 
   return data.map((service) => ({
     ...service,
@@ -229,7 +231,7 @@ export const getServiceCalendar = async (
     queryString ? `?${queryString}` : ""
   }`;
 
-  const data = await apiCall<CalendarResponse>(endpoint);
+  const data = await apiCall<CalendarResponse>(endpoint, {}, false);
 
   return {
     ...data,
@@ -246,7 +248,7 @@ export const getUnifiedCalendar = async (
   if (month) params.set("month", month.toString());
 
   const endpoint = `/calendar/unified${params.toString() ? `?${params}` : ""}`;
-  const data = await apiCall<UnifiedCalendarResponse>(endpoint);
+  const data = await apiCall<UnifiedCalendarResponse>(endpoint, {}, false);
 
   const convertedCalendarData: Record<string, Record<string, boolean>> = {};
 
@@ -280,7 +282,9 @@ export const checkBookingFeasibility = async (
   });
 
   const data = await apiCall<BookingFeasibilityResponse>(
-    `/calendar/check-booking?${params}`
+    `/calendar/check-booking?${params}`,
+    {},
+    false
   );
 
   return {
@@ -307,7 +311,11 @@ export const checkUnitsAvailability = async (
     unit_count: unitCount.toString(),
   });
 
-  return apiCall<UnitsCheckResponse>(`/calendar/check-units?${params}`);
+  return apiCall<UnitsCheckResponse>(
+    `/calendar/check-units?${params}`,
+    {},
+    false
+  );
 };
 
 export const createOrder = async (
@@ -322,10 +330,14 @@ export const createOrder = async (
     location_lng: orderData.location_lng || undefined,
   };
 
-  const data = await apiCall<OrderResponse>("/order", {
-    method: "POST",
-    body: JSON.stringify(backendOrderData),
-  });
+  const data = await apiCall<OrderResponse>(
+    "/order",
+    {
+      method: "POST",
+      body: JSON.stringify(backendOrderData),
+    },
+    true
+  );
 
   return {
     ...data,

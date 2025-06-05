@@ -32,6 +32,8 @@ interface LoginModalProps {
   onSuccess?: () => void;
 }
 
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
 const LoginModal = ({ isOpen, onClose, onSuccess }: LoginModalProps) => {
   const buttonRef = useRef<HTMLDivElement>(null);
   const loginMutation = useGoogleLogin();
@@ -39,7 +41,7 @@ const LoginModal = ({ isOpen, onClose, onSuccess }: LoginModalProps) => {
   useEffect(() => {
     if (isOpen && typeof window !== "undefined" && window.google) {
       window.google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        client_id: googleClientId,
         callback: (response) => {
           loginMutation.mutate(response.credential, {
             onSuccess: () => {
