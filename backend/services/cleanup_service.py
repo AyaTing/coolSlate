@@ -22,7 +22,7 @@ async def cleanup_loop(db):
 
 async def run_cleanup(db):
     try:
-        change_tag = await db.execute("""
+        await db.execute("""
             UPDATE booking_slots
             SET is_locked = false,
                 temp_lock_id = NULL,
@@ -65,7 +65,7 @@ async def find_orders_with_all_slots_expired(db):
           AND NOT EXISTS (
               SELECT 1 
               FROM booking_slots bs
-              JOIN time_slot_locks tsl ON bs.temp_lock_id = tsl.id
+              LEFT JOIN time_slot_locks tsl ON bs.temp_lock_id = tsl.id
               WHERE bs.order_id = o.id
                 AND bs.is_locked = true
                 AND (tsl.expires_at IS NULL OR tsl.expires_at > NOW())
