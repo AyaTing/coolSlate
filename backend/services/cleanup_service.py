@@ -82,13 +82,10 @@ async def delete_orders_with_expired_slots(expired_orders: list, db):
                 order_number = order["order_number"]
                 service_type = order["service_type"]
                 unit_count = order["unit_count"]
-                if service_type == "INSTALLATION":
-                    required_hours = (
+                required_hours = (
                         order["base_duration_hours"] + 
                         (unit_count - 1) * order["additional_duration_hours"]
                     )
-                else:
-                    required_hours = order["base_duration_hours"] * unit_count
                 required_hours = min(required_hours, 8)
                 slots = await db.fetch("""
                     SELECT bs.*, tsl.id as lock_id

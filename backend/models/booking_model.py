@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, time
 from models.service_model import ServiceType
@@ -7,10 +7,11 @@ from models.payment_model import PaymentStatus
 
 class OrderStatus(str, Enum):
     PENDING = "pending"
-    PAID = "paid"
+    PENDING_SCHEDULE = "pending_schedule"
     SCHEDULED = "scheduled"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+    PRECANCEL = "precancel" 
     PENDING_RESCHEDULE = "pending_reschedule"
 
 

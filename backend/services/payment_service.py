@@ -142,11 +142,11 @@ async def handle_webhook(payload: bytes, sig_header: str, db):
                     if stripe_amount != expected_amount:
                         print(f"訂單 {order_info['order_number']} 金額不符，實付={stripe_amount/100}，應付={order_info['total_amount']}")
                         return {"status": "error", "message": "付款金額與訂單金額不符"}
-                    update_query = "UPDATE orders SET status = 'paid', payment_status = 'paid', updated_at = NOW(), checkout_session_id = $2 WHERE id = $1 AND payment_status = 'unpaid'"
+                    update_query = "UPDATE orders SET status = 'pending_schedule', payment_status = 'paid', updated_at = NOW(), checkout_session_id = $2 WHERE id = $1 AND payment_status = 'unpaid'"
                     result = await db.execute(update_query, order_id, session['id'])
                     if result == "UPDATE 1":
                         await extend_booking_locks(order_id, db)
-                        print(f"✅ 訂單 {order_info['order_number']} 付款成功，已延長鎖定時間")
+                        print(f"訂單 {order_info['order_number']} 付款成功，已延長鎖定時間")
                         return {"status": "received"}
                     else:
                         print(f"訂單 {order_id} 可能已處理過")
