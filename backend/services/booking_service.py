@@ -273,6 +273,10 @@ async def get_user_orders_service(user_id, db):
             order_dict = dict(order)
             order_dict["order_id"] = order_dict["id"]
             order_dict["booking_slots"] = [dict(slot) for slot in slots]
+            if order_dict["equipment_details"]:
+                order_dict["equipment_details"] = json.loads(order_dict["equipment_details"])
+            else:
+                order_dict["equipment_details"] = None
             result.append(OrderDetail(**order_dict))
         return result
     except Exception as e:
@@ -290,6 +294,10 @@ async def get_order_detail_service(order_id: int, db):
         order_dict = dict(order)
         order_dict["order_id"] = order_dict["id"]
         order_dict["booking_slots"] = [dict(slot) for slot in slots]
+        if order_dict["equipment_details"]:
+            order_dict["equipment_details"] = json.loads(order_dict["equipment_details"])
+        else:
+            order_dict["equipment_details"] = None
         return OrderDetail(**order_dict)
     except Exception as e:
         print(f"出現預期外錯誤，無法確認：{e}")
