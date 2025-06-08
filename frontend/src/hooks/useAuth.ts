@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import {
   googleLogin,
   getCurrentUser,
@@ -25,16 +26,20 @@ export const useGoogleLogin = () => {
 export const useLogout = () => {
   const { logout } = useAuthContext();
   const queryClient = useQueryClient();
+  const router = useRouter();
   return useMutation({
     mutationFn: logoutAPI,
     onSuccess: () => {
       queryClient.clear();
       logout();
+
+      router.navigate({ to: "/" });
     },
     onError: (error: Error) => {
       console.error("Google 登出失敗，仍清除本地狀態:", error.message);
       queryClient.clear();
       logout();
+      router.navigate({ to: "/" });
     },
   });
 };
