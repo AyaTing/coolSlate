@@ -49,7 +49,7 @@ async def request_cancel_order(
 ):
     try:
         await verify_order_ownership(order_id, current_user["id"], db)
-        return request_cancel_order_service(order_id, db)
+        return await request_cancel_order_service(order_id, db)
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
