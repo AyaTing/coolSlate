@@ -138,7 +138,7 @@ function toBackendServiceType(frontendType: string): string {
   return mapped;
 }
 
-function toFrontendServiceType(backendType: string): string {
+export function toFrontendServiceType(backendType: string): string {
   const mapped =
     SERVICE_TYPE_REVERSE_MAP[
       backendType as keyof typeof SERVICE_TYPE_REVERSE_MAP
