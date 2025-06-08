@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from utils.dependencies import get_connection
 from utils.auth import verify_order_ownership
 from models.booking_model import OrderRequest, OrderResponse, OrderDetail
-from services.booking_service import create_order_with_lock, get_order_detail_service, get_user_orders_service
+from services.booking_service import create_order_with_lock, get_order_detail_service, get_user_orders_service, request_cancel_order_service
 import asyncpg
 from utils.auth import require_auth
 from typing import List
@@ -39,3 +39,23 @@ async def get_order_detail(order_id: int, current_user: dict = Depends(require_a
     except Exception as e:
         print(f"取得訂單詳情失敗: {e}")
         raise HTTPException(status_code=500, detail="取得訂單詳情失敗")
+    
+
+@router.post("/order/{order_id}/cancel-request")
+async def request_cancel_order(
+    order_id: int, 
+    current_user: dict = Depends(require_auth), 
+    db: asyncpg.Connection = Depends(get_connection)
+):
+    try:
+        await verify_order_ownership(order_id, current_user["id"], db)
+        return request_cancel_order_service(order_id, db)
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        print(f"取消申請失敗: {e}")
+        raise HTTPException(status_code=500, detail="取消申請失敗")
+
+
+
+

@@ -302,3 +302,32 @@ async def get_order_detail_service(order_id: int, db):
     except Exception as e:
         print(f"出現預期外錯誤，無法確認：{e}")
         raise HTTPException(status_code=500, detail="出現預期外錯誤，無法確認")
+    
+
+async def request_cancel_order_service(order_id: int, db):
+    try:
+        select_query = "SELECT status, payment_status FROM orders WHERE id = $1"
+        order = await db.fetchrow(select_query, order_id)
+        if not order:
+            raise HTTPException(status_code=404, detail="訂單不存在")
+        if order["payment_status"] != "paid":
+            raise HTTPException(status_code=400, detail="僅已付款訂單可申請取消")
+        # 目前只讓使用者填寫一個時間
+        select_query = "SELECT preferred_date FROM booking_slots WHERE order_id = $1 AND is_primary = true"
+        slot = await db.fetchrow(select_query, order_id)
+        if slot:
+            booking_date = slot["preferred_date"]
+            three_days_later = datetime.now(TAIPEI_TZ).date() + timedelta(days=3)
+            if booking_date <= three_days_later:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="僅接受預定日期三日前的取消申請"
+                )
+        update_query = "UPDATE orders SET status = 'precancel' WHERE id = $1"
+        await db.execute(update_query, order_id)
+        return {"message": "取消申請已提交"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"取消申請處理失敗: {e}")
+        raise HTTPException(status_code=500, detail="取消申請處理失敗")
