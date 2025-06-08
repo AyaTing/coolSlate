@@ -44,12 +44,13 @@ const PaymentModal = ({
   return (
     <dialog
       open={isOpen}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop:bg-black backdrop:bg-opacity-50"
+      className="fixed inset-0 bg-[var(--color-text-primary)]/10 z-50 m-auto "
     >
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
+      <div className="bg-[var(--color-brand-primary)] rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         <header className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">完成付款</h2>
+          <h2 className="text-xl font-semibold text-[var(--color-text-secondary)]">
+            完成付款
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors p-1"
@@ -70,10 +71,7 @@ const PaymentModal = ({
             </svg>
           </button>
         </header>
-
-        {/* Content */}
         <main className="p-6">
-          {/* 付款完成狀態 */}
           {paymentStatus?.payment_status === "paid" && (
             <section className="text-center">
               <div
@@ -102,8 +100,6 @@ const PaymentModal = ({
               </button>
             </section>
           )}
-
-          {/* 載入中狀態 */}
           {isLoading && (
             <section className="text-center py-8">
               <div
@@ -114,8 +110,6 @@ const PaymentModal = ({
               <p className="text-gray-600">準備付款頁面中...</p>
             </section>
           )}
-
-          {/* 錯誤狀態 */}
           {error && (
             <section className="text-center">
               <div
@@ -147,8 +141,6 @@ const PaymentModal = ({
               </div>
             </section>
           )}
-
-          {/* 準備付款狀態 */}
           {checkoutSession && paymentStatus?.payment_status === "unpaid" && (
             <section>
               <header className="text-center mb-6">
@@ -159,7 +151,7 @@ const PaymentModal = ({
                 >
                   💳
                 </div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                <h3 className="text-xl font-semibold text-[var(--color-text-secondary)] mb-2">
                   前往 Stripe 付款
                 </h3>
               </header>
@@ -178,7 +170,7 @@ const PaymentModal = ({
               <div className="space-y-3">
                 <button
                   onClick={handlePayment}
-                  className="w-full bg-[var(--color-brand-primary)] text-[var(--color-brand-secondary)] py-4 px-4 rounded-lg hover:bg-[var(--color-brand-secondary-light)] transition-colors font-semibold text-lg"
+                  className="w-full bg-[var(--color-brand-secondary)] text-[var(--color-text-primary)] py-4 px-4 rounded-lg hover:bg-[var(--color-brand-secondary-light)] transition-colors font-semibold text-lg"
                 >
                   前往 Stripe 付款 →
                 </button>

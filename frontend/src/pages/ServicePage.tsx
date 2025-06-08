@@ -174,9 +174,6 @@ const ServicePage = () => {
           <h1 className="text-3xl md:text-4xl font-bold text-[var(--color-text-primary)] mb-4">
             冷氣服務預約
           </h1>
-          <p className="text-[var(--color-text-secondary)] text-lg">
-            選擇服務類型，查看可預約時段
-          </p>
         </div>
 
         <div className="mb-8">
@@ -190,7 +187,6 @@ const ServicePage = () => {
                 <button
                   key={serviceName}
                   onClick={() => {
-                    console.log(`🎯 切換服務: ${serviceName}`);
                     setSelectedService(serviceName);
                     setSelectedDate(null);
                     setSelectedTime(null);
@@ -218,7 +214,7 @@ const ServicePage = () => {
           </div>
         </div>
 
-        <div className="bg-[var(--color-bg-card)] rounded-lg shadow-md p-6">
+        <div className="bg-gradient-to-br from-[var(--color-brand-primary-light)]/10 via-transparent to-[var(--color-bg-main))  rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold mb-6 text-[var(--color-text-primary)]">
             選擇 {selectedService} 的預約時段
           </h2>
@@ -262,31 +258,26 @@ const ServicePage = () => {
                     {isLoading && (
                       <div className="text-center py-8">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--color-brand-primary)] mx-auto mb-4"></div>
-                        <p className="text-[var(--color-text-secondary)]">
-                          載入時段中...
-                        </p>
                       </div>
                     )}
 
                     {!selectedDate && !isLoading && (
-                      <div className="text-center py-8 text-[var(--color-text-secondary)]">
-                        <div className="mb-4">
+                      <div className="text-center py-8 text-[var(--color-text-tertiary)]">
+                        <div className="mb-4 flex items-center justify-center">
                           <svg
-                            className="w-12 h-12 mx-auto text-gray-300"
-                            fill="none"
-                            stroke="currentColor"
+                            width="48"
+                            height="48"
                             viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#d1d5db"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z"
-                            />
+                            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
                         </div>
                         <p>請點擊月曆選擇日期</p>
-                        <p className="text-sm mt-1">綠點標示的日期可以預約</p>
                       </div>
                     )}
 
@@ -309,14 +300,10 @@ const ServicePage = () => {
                       selectedDayData.available_slots.length > 0 &&
                       !isLoading && (
                         <div>
-                          <div className="mb-4">
+                          <div className="mb-6">
                             <p className="font-medium text-[var(--color-text-primary)]">
                               {selectedDate} (
                               {selectedDayData.is_weekend ? "週末" : "平日"})
-                            </p>
-                            <p className="text-sm text-[var(--color-text-secondary)]">
-                              {selectedDayData.available_slots.length}{" "}
-                              個可用時段
                             </p>
                           </div>
 

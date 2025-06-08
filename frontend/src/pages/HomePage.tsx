@@ -21,7 +21,7 @@ const ServiceItemCard = ({
   imageElement,
 }: ServiceItemCardProps) => {
   return (
-    <div className="bg-[var()] p-10 rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200/50 hover:border-[var(--color-brand-primary)]/50 flex flex-col">
+    <div className=" p-10 rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200/50 hover:border-[var(--color-brand-primary)]/50 flex flex-col">
       <div className="text-3xl text-[var(--color-brand-primary)]">
         {imageElement}
       </div>
@@ -33,7 +33,7 @@ const ServiceItemCard = ({
       </p>
       <Link
         to={ctaLink}
-        className="self-start text-lg font-medium text-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary-dark)] group mx-auto "
+        className="self-start text-lg font-medium text-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary-light)] group mx-auto "
       >
         {ctaText}
         <span
@@ -79,7 +79,7 @@ const HomePage = () => {
           <img src={photoImage_1} alt="首圖照片" className="rounded-3xl" />
         </div>
       </section>
-      <div className="grid sm:grid-cols-3 gap-4 lg:gap-6 p-3 md:p-4 bg-gradient-to-br from-[var(--color-brand-primary-light)]/10 via-transparent to-[var(--color-brand-secondary-light)]/10 rounded-xl shadow-sm">
+      <div className="grid sm:grid-cols-3 gap-4 lg:gap-6 p-3 md:p-4 bg-gradient-to-br from-[var(--color-brand-primary-light)]/10 via-transparent to-[var(--color-brand-secondary)] rounded-xl shadow-sm">
         <ServiceItemCard
           imageElement={Images.repairImg}
           title="冷氣維修"
