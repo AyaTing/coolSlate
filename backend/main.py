@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 from db.database import close_pool, create_pool
 from fastapi.middleware.cors import CORSMiddleware
-from routers import calendar_router, booking_router, payment_router, auth_router
+from routers import calendar_router, booking_router, payment_router, auth_router, admin_router
 from services.cleanup_service import cleanup_loop
 import asyncio
 import httpx
@@ -58,6 +58,7 @@ app.include_router(auth_router.router)
 app.include_router(calendar_router.router)
 app.include_router(booking_router.router)
 app.include_router(payment_router.router)
+app.include_router(admin_router.router)
 
 
 @app.get("/status")
