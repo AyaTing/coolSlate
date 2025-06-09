@@ -40,8 +40,26 @@ async def get_all_orders_service(
         LIMIT {limit_param} OFFSET {offset_param}
         """
         orders = await db.fetch(select_query, *params, limit, offset)
+        result = []
+        for order in orders:
+            select_query = """
+            SELECT preferred_date, preferred_time, contact_name, contact_phone, is_primary, is_selected 
+            FROM booking_slots 
+            WHERE order_id = $1 
+            ORDER BY is_primary DESC, preferred_date, preferred_time
+            """
+            slots = await db.fetch(select_query, order["id"])
+            order_dict = dict(order)
+            order_dict["order_id"] = order_dict["id"]
+            order_dict["booking_slots"] = [dict(slot) for slot in slots]
+            if order_dict["equipment_details"]:
+                import json
+                order_dict["equipment_details"] = json.loads(order_dict["equipment_details"])
+            else:
+                order_dict["equipment_details"] = None
+            result.append(order_dict)
         return {
-            "orders": orders,
+            "orders": result,
             "total": total,
             "page": page,
             "limit": limit,
