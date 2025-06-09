@@ -185,8 +185,11 @@ const ProfilePage = () => {
         await requestCancelOrder(orderDetail!.order_id);
         setShowCancelConfirm(false);
         setOrderId(null);
-        queryClient.invalidateQueries({ queryKey: ["orders"] });
-        queryClient.invalidateQueries({ queryKey: ["orderDetail", orderId] });
+        queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === "orders" ||
+            query.queryKey[0] === "orderDetail",
+        });
       } catch (error) {
         console.error(error);
         alert("申請失敗，請重試");
