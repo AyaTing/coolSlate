@@ -47,7 +47,7 @@ def send_scheduling_success_email(order_data: dict):
 <div
   style="
     font-family: Arial, sans-serif;
-    max-width: 600px;
+    max-width: 700px;
     margin: 0 auto;
     padding: 20px;
   "
@@ -68,6 +68,8 @@ def send_scheduling_success_email(order_data: dict):
       <a
           href="{calendar_url}"
           style="
+          width:180px;
+          height:25px;
             display: block;
             background: #d8f999;
             color: black;
