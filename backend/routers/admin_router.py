@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from utils.auth import require_admin, get_connection
-from services.admin_service import get_all_orders_service, get_all_users_service, get_user_orders_service_by_admin
+from services.admin_service import (
+    get_all_orders_service,
+    get_all_users_service,
+    get_user_orders_service_by_admin,
+)
 from services.booking_service import get_order_detail_service
+from services.scheduling_service import process_immediate_scheduling
 from models.booking_model import OrderDetail
 import asyncpg
 from typing import Optional
@@ -66,6 +71,24 @@ async def get_user_orders_by_admin(
     except Exception as e:
         print(f"取得訂單列表失敗: {e}")
         raise HTTPException(status_code=500, detail="取得訂單列表失敗")
+
+
+@router.post("/scheduling")
+async def schedule_order(
+    order_id: int,
+    current_user: dict = Depends(require_admin),
+    db: asyncpg.Connection = Depends(get_connection),
+):
+    try:
+        order = await get_order_detail_service(order_id, db)
+        if order.service_type in ["INSTALLATION", "MAINTENANCE"]:
+            result = await process_immediate_scheduling(order_id, db)
+            return result
+        else:
+            pass
+    except Exception as e:
+        print(f"排程出現錯誤: {str(e)}")
+        raise HTTPException(status_code=500, detail="排程出現錯誤")
 
 
 # @router.post("/order/{order_id}/cancel")

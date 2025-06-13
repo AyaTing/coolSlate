@@ -6,6 +6,7 @@ from models.payment_model import (
     PaymentStatus,
     CheckoutSessionResponse
 )
+from services.scheduling_service import process_immediate_scheduling
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
@@ -145,12 +146,16 @@ async def handle_webhook(payload: bytes, sig_header: str, db):
                     update_query = "UPDATE orders SET status = 'pending_schedule', payment_status = 'paid', updated_at = NOW(), checkout_session_id = $2 WHERE id = $1 AND payment_status = 'unpaid'"
                     result = await db.execute(update_query, order_id, session['id'])
                     if result == "UPDATE 1":
-                        await extend_booking_locks(order_id, db)
-                        print(f"訂單 {order_info['order_number']} 付款成功，已延長鎖定時間")
+                        service_type = order_info["service_type"]
+                        if service_type in ["INSTALLATION", "MAINTENANCE"]:   
+                            await process_immediate_scheduling(order_id, db)
+                            print(f"訂單 {order_info['order_number']} 付款成功，準備進行排程")
+                        else:
+                            print(f"訂單 {order_info['order_number']} 付款成功，等待排程")
                         return {"status": "received"}
                     else:
                         print(f"訂單 {order_id} 可能已處理過")
-                        return {"status": "received"}
+                    return {"status": "received"}
             except Exception as e:
                 print(f"處理 webhook 事件時發生錯誤: {str(e)}")
                 return {"status": "error", "message": str(e)}
@@ -159,15 +164,5 @@ async def handle_webhook(payload: bytes, sig_header: str, db):
             return {"status": "received"}
 
 
-async def extend_booking_locks(order_id, db):
-    try:
-        new_expires_at = datetime.now(TAIPEI_TZ) + timedelta(days=7)
-        update_query = "UPDATE time_slot_locks SET expires_at = $1 WHERE id IN ( SELECT bs.temp_lock_id FROM booking_slots bs WHERE bs.order_id = $2  AND bs.temp_lock_id IS NOT NULL )"
-        await db.execute(update_query, new_expires_at, order_id)
-        update_query = "UPDATE booking_slots SET lock_expires_at = $1 WHERE order_id = $2"
-        await db.execute(update_query, new_expires_at, order_id)
-        print(f"已延長訂單 {order_id} 的鎖定到 {new_expires_at}")  
-    except Exception as e:
-        print(f"延長鎖定失敗: {e}")
 
 
