@@ -63,28 +63,23 @@ def send_scheduling_success_email(order_data: dict):
         <h1 style="text-align: center; margin: 5px auto 10px; color: #fff">
           冷氣服務排程確認通知
         </h1>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
-      <h2 style="color: #fff; margin: 0; line-height: 1.2;">{order_data.get("user_name", "客戶")}，您好</h2>
-      <a
-          href="{calendar_url}"
-          style="
-          width:180px;
-          height:25px;
-display: inline-block;
-            background: #d8f999;
-            color: black;
-            padding: 8px 12px;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            white-space: nowrap;
-            text-align: center;
-          "
-        >
-          📅 加入 Google 行事曆
-        </a>
-      </div>
+    <table style="width: 100%; margin: 20px 0;" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="vertical-align: top;">
+          <h2 style="color: #fff; margin: 0; line-height: 1.2;">
+            {order_data.get("user_name", "客戶")}，您好
+          </h2>
+        </td>
+        <td style="text-align: right; vertical-align: top; padding-top: 4px;">
+          <a href="{calendar_url}" 
+             style="display: inline-block; background: #d8f999; color: black; 
+                    padding: 8px 12px; text-decoration: none; border-radius: 6px; 
+                    font-weight: bold; font-size: 14px; white-space: nowrap;">
+            📅 加入 Google 行事曆
+          </a>
+        </td>
+      </tr>
+    </table>
       <div
         style="
           background: white;
