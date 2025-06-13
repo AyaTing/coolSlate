@@ -30,16 +30,16 @@ def send_scheduling_success_email(order_data: dict):
   "
 >
   <div style="display: flex; flex-direction: column">
-    <div style="width: 60%; margin: 0 auto">
-    <img
-      src="https://cool-slate.ayating.workers.dev/assets/logo_1-ChZ3hRQB.png"
-      style="width: 100%; height: 150px; object-fit: cover; display: block"
-    />
-  </div>
     <div style="background: #395fd2; padding: 30px; border-radius: 0 0 8px 8px">
+          <div style="width: 60%; margin: 0 auto; background: #fff">
+        <img
+          src="https://cool-slate.ayating.workers.dev/assets/logo_1-ChZ3hRQB.png"
+          style="width: 100%; height: 150px; object-fit: cover; display: block"
+        />
+      </div>
           <div style="text-align: center">
         <h1 style="margin: 5px auto 10px; color: #fff">
-          ✅ 冷氣服務排程確認通知
+          冷氣服務排程確認通知
         </h1>
       </div>
       <h2 style="color: #fff">{order_data.get("user_name", "客戶")}，您好</h2>
