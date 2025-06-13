@@ -73,7 +73,7 @@ async def get_user_orders_by_admin(
         raise HTTPException(status_code=500, detail="取得訂單列表失敗")
 
 
-@router.post("/scheduling")
+@router.post("/scheduling/{order_id}")
 async def schedule_order(
     order_id: int,
     current_user: dict = Depends(require_admin),
@@ -85,7 +85,7 @@ async def schedule_order(
             result = await process_immediate_scheduling(order_id, db)
             return result
         else:
-            pass
+            pass # 待維修排程邏輯完成
     except Exception as e:
         print(f"排程出現錯誤: {str(e)}")
         raise HTTPException(status_code=500, detail="排程出現錯誤")
