@@ -36,8 +36,12 @@ def send_scheduling_success_email(order_data: dict):
     />
   </div>
   <div style="display: flex; flex-direction: column">
-    <h1 style="margin: 5px auto 10px">✅冷氣服務排程確認通知</h1>
     <div style="background: #395fd2; padding: 30px; border-radius: 0 0 8px 8px">
+          <div style="text-align: center">
+        <h1 style="margin: 5px auto 10px; color: #fff">
+          ✅ 冷氣服務排程確認通知
+        </h1>
+      </div>
       <h2 style="color: #fff">{order_data.get("user_name", "客戶")}，您好</h2>
       <div
         style="
@@ -75,8 +79,8 @@ def send_scheduling_success_email(order_data: dict):
           >
         </p>
         <p><strong>預估結束：</strong>{estimated_end_time}</p>
-        <p><strong>聯絡人：</strong>NT$ {order_data.get("contact_name")}</p>
-        <p><strong>聯絡電話：</strong>NT$ {order_data.get("contact_phone")}</p>
+        <p><strong>聯絡人：</strong>{order_data.get("contact_name")}</p>
+        <p><strong>聯絡電話：</strong>{order_data.get("contact_phone")}</p>
       </div>
       <div
         style="

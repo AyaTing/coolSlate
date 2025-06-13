@@ -86,12 +86,9 @@ async def process_immediate_scheduling(order_id: int, db):
             await release_unused_locks(order_id, selected_slot["id"], db)
         email_sent = False
         try:
-            select_query = (
-                "SELECT contact_name, contact_phone FROM booking_slots WHERE "
-            )
-            select_query = "SELECT u.email FROM users u JOIN orders o ON u.id = o.user_id WHERE o.id = $1"
-            user_email = await db.fetchval(select_query, order_id)
-            if user_email:
+            select_query = "SELECT u.email, u.name FROM users u JOIN orders o ON u.id = o.user_id WHERE o.id = $1"
+            user = await db.fetchrow(select_query, order_id)
+            if user:
                 order_data  = {
                     "order_id": order_id,
                     "order_number": order["order_number"],
@@ -103,7 +100,8 @@ async def process_immediate_scheduling(order_id: int, db):
                     "estimated_end_time": estimated_end_time,
                     "contact_name": selected_slot.get("contact_name"),
                     "contact_phone": selected_slot.get("contact_phone"),
-                    "user_email": user_email,
+                    "user_email": user["email"],
+                    "user_name": user["name"]
                 }
                 result = send_scheduling_success_email(order_data)
                 email_sent = result.get("success", False)
