@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from mail_service import send_scheduling_success_email
+from services.mail_service import send_scheduling_success_email
 
 TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 
