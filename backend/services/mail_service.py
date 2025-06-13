@@ -1,6 +1,7 @@
 import resend
 import os
-from datetime import datetime
+from urllib.parse import quote
+from datetime import datetime, date, time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,17 +10,39 @@ resend.api_key = os.getenv("RESEND_API_KEY")
 
 def send_scheduling_success_email(order_data: dict):
     try:
+
         scheduled_date = order_data["scheduled_date"].strftime("%Y年%m月%d日")
         scheduled_time = order_data["scheduled_time"].strftime("%H:%M")
         estimated_end_time = order_data["estimated_end_time"].strftime("%H:%M")
+
+        start_datetime = datetime.combine(
+            order_data["scheduled_date"], order_data["scheduled_time"]
+        )
+        end_datetime = datetime.combine(
+            order_data["scheduled_date"], order_data["estimated_end_time"]
+        )
+
+        start_str = start_datetime.strftime("%Y%m%dT%H%M%S")
+        end_str = end_datetime.strftime("%Y%m%dT%H%M%S")
+
         service_type_map = {
-        "INSTALLATION": "新機安裝",
-        "MAINTENANCE": "冷氣保養",
-        "REPAIR": "冷氣維修",
-    }
+            "INSTALLATION": "新機安裝",
+            "MAINTENANCE": "冷氣保養",
+            "REPAIR": "冷氣維修",
+        }
         service_type = service_type_map.get(
-        order_data["service_type"], order_data["service_type"]
-    )
+            order_data["service_type"], order_data["service_type"]
+        )
+
+        event_title = f"Cool Slate - {service_type}服務"
+        event_details = f"""
+訂單編號：{order_data["order_number"]}
+服務類型：{service_type}
+服務地址：{order_data["location_address"]}
+聯絡人：{order_data.get("contact_name")}
+聯絡電話：{order_data.get("contact_phone")}
+        """.strip()
+        calendar_url = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={quote(event_title)}&dates={start_str}/{end_str}&details={quote(event_details)}&location={quote(order_data['location_address'])}"
         html_content = f"""
 <div
   style="
@@ -37,12 +60,27 @@ def send_scheduling_success_email(order_data: dict):
           style="width: 100%; height: 150px; object-fit: cover; display: block"
         />
       </div>
-          <div style="text-align: center">
-        <h1 style="margin: 5px auto 10px; color: #fff">
+        <h1 style="text-align: center; margin: 5px auto 10px; color: #fff">
           冷氣服務排程確認通知
         </h1>
-      </div>
+        <div style="display: flex; justify-content: space-between">
       <h2 style="color: #fff">{order_data.get("user_name", "客戶")}，您好</h2>
+      <a
+          href="{calendar_url}"
+          style="
+            display: block;
+            background: #d8f999;
+            color: black;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          "
+        >
+          📅 加入 Google 行事曆
+        </a>
+      </div>
       <div
         style="
           background: white;
@@ -110,21 +148,20 @@ def send_scheduling_success_email(order_data: dict):
 </div>
         """
         params = {
-            "from": "Cool Slate 冷氣服務 <noreply@mail.ayating.lol>",
+            "from": "Cool Slate 冷氣服務預約 <noreply@mail.ayating.lol>",
             "to": [order_data["user_email"]],
-            "subject": f"✅ 排程確認 - {service_type}服務已安排",
+            "subject": f"【Cool Slate】✅ 排程確認 - {service_type}服務已安排",
             "html": html_content,
         }
         result = resend.Emails.send(params)
-        if result["success"]:   
-          print(f"排程成功郵件已發送給 {order_data['user_email']}")
-          return {"success": True}
+        if result and "id" in result:
+            print(
+                f"排程成功郵件已發送給 {order_data["user_email"]}, 郵件ID: {result["id"]}"
+            )
+            return {"success": True, "email_id": result["id"]}
         else:
-          print(f"郵件發送失敗: {result.get('error', '未知錯誤')}")
-          return {"success": False, "error": result.get('error')}
-    except resend.ResendError as resend_error:
-        print(f"Resend API 錯誤: {resend_error}")
-        return {"success": False, "error": f"Resend API 錯誤: {resend_error}"}
+            print(f"訂單 {order_data["order_id"]}郵件發送失敗")
+            return {"success": False, "error": "無效的回應格式"}
     except Exception as e:
         print(f"未知錯誤: {e}")
         return {"success": False, "error": f"未知錯誤: {e}"}
