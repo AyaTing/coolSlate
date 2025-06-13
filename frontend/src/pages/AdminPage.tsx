@@ -1,10 +1,11 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getAllOrders,
   getAllUsers,
   getOrderByAdmin,
   getUserOrdersByAdmin,
+  scheduleOrderByAdmin,
 } from "../services/adminAPI";
 import { type OrderDetail } from "../services/orderAPI";
 import {
@@ -42,12 +43,14 @@ const AdminPage = () => {
     useState<AdminOptionsType>("未完工追蹤");
   const [orderId, setOrderId] = useState<number | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
-  const [usersPage, setUsersPage] = useState<number>(1);
+  // const [usersPage, setUsersPage] = useState<number>(1);
   const [ordersPage, setOrdersPage] = useState<number>(1);
   const [searchUser, setSearchUser] = useState<string>("");
   const [orderStatus, setOrderStatus] = useState<string>("");
   const [paymentStatus, setPaymentStatus] = useState<string>("");
   const [serviceType, setServiceType] = useState<string>("");
+  const [isScheduling, setIsScheduling] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (selectedOption === "訂單總表") {
@@ -69,15 +72,15 @@ const AdminPage = () => {
         status: orderStatus || undefined,
         payment_status: paymentStatus || undefined,
         page: ordersPage,
-        limit: selectedOption === "未完工追蹤" ? 9999 : 20,
+        limit: selectedOption === "未完工追蹤" ? 100 : 20, // 後端上限 100，待處理頁面載入
       }),
   });
 
   const { data: users } = useQuery({
-    queryKey: ["admin-users", { page: usersPage, search: searchUser }],
+    queryKey: ["admin-users", { page: 1, search: searchUser }],
     queryFn: () =>
       getAllUsers({
-        page: usersPage,
+        page: 1, // 暫時處置
         limit: 10,
         search: searchUser || undefined,
       }),
@@ -92,6 +95,33 @@ const AdminPage = () => {
     queryFn: () => getUserOrdersByAdmin(userId!),
     enabled: !!userId,
   });
+
+  const handleScheduleOrder = async (orderId: number) => {
+    try {
+      setIsScheduling(true);
+      const result = await scheduleOrderByAdmin(orderId);
+      if (result.success) {
+        const emailStatus = result.email_sent
+          ? "郵件已發送！"
+          : "郵件發送失敗，請通知會員。";
+        alert(`排程成功！${emailStatus}`);
+        queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === "admin-orders" ||
+            query.queryKey[0] === "admin-order-detail" ||
+            query.queryKey[0] === "admin-user-orders",
+        });
+        setOrderId(null);
+      } else {
+        alert("排程失敗，請稍後再試");
+      }
+    } catch (error) {
+      console.error("排程錯誤:", error);
+      alert("排程失敗，請稍後再試");
+    } finally {
+      setIsScheduling(false);
+    }
+  };
 
   const OrderCard = ({ order, onClick }: OrderCardProps) => {
     const today = new Date();
@@ -153,7 +183,19 @@ const AdminPage = () => {
               需先進行退款處理。
             </p>
           )}
-          <div className="flex gap-2 mt-4 justify-end">
+          <div className="flex gap-2 mt-4 justify-between">
+            {(orderDetail.status === "pending_schedule" ||
+              orderDetail.status === "paid") &&
+              orderDetail.payment_status === "paid" && (
+                <button
+                  onClick={() => handleScheduleOrder(orderDetail.order_id)}
+                  disabled={isScheduling}
+                  className="px-4 py-2 bg-[var(--color-brand-primary)] text-[var(--color-text-secondary)] rounded"
+                >
+                  {isScheduling ? "排程中..." : "排程"}
+                </button>
+              )}
+            <span></span>
             <button
               onClick={() => setOrderId(null)}
               className="px-4 py-2 bg-[var(--color-text-tertiary)] text-[var(--color-text-secondary)] rounded"

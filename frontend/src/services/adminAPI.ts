@@ -23,6 +23,16 @@ interface AdminUserOrdersResponse {
   orders: OrderDetail[];
 }
 
+interface AdminScheduleOrderResponse {
+  success: boolean;
+  order_id: number;
+  schedule_id: number;
+  scheduled_date: string;
+  scheduled_time: string;
+  estimated_end_time: string;
+  email_sent: boolean;
+}
+
 async function apiCall<T>(
   endpoint: string,
   options?: RequestInit,
@@ -118,6 +128,16 @@ export const getUserOrdersByAdmin = async (
   return apiCall<AdminUserOrdersResponse>(
     `/admin/user/${userId}/orders`,
     {},
+    true
+  );
+};
+
+export const scheduleOrderByAdmin = async (
+  orderId: number
+): Promise<AdminScheduleOrderResponse> => {
+  return apiCall<AdminScheduleOrderResponse>(
+    `/admin/scheduling/${orderId}`,
+    { method: "POST" },
     true
   );
 };
