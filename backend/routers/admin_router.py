@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from utils.auth import require_admin, get_connection
 from services.admin_service import (
     get_all_orders_service,
     get_all_users_service,
     get_user_orders_service_by_admin,
+    cancel_order,
+    update_order_refund_status,
 )
 from services.booking_service import get_order_detail_service
 from services.scheduling_service import process_immediate_scheduling
@@ -85,16 +87,40 @@ async def schedule_order(
             result = await process_immediate_scheduling(order_id, db)
             return result
         else:
-            pass # 待維修排程邏輯完成
+            pass  # 待維修排程邏輯完成
     except Exception as e:
         print(f"排程出現錯誤: {str(e)}")
         raise HTTPException(status_code=500, detail="排程出現錯誤")
 
 
-# @router.post("/order/{order_id}/cancel")
-# async def cancel_order_by_admin(
-#     order_id: int,
-#     current_user: dict = Depends(require_admin),
-#     db: asyncpg.Connection = Depends(get_connection),
-# ):
-#     pass
+@router.patch("/order/{order_id}/refund")
+async def update_refund_status(
+    order_id: int,
+    refund_user: str = Body(..., embed=True),
+    current_user: dict = Depends(require_admin),
+    db: asyncpg.Connection = Depends(get_connection),
+):
+    try:
+        result = await update_order_refund_status(order_id, refund_user, db)
+        return result
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        print(f"更新退款狀態失敗: {e}")
+        raise HTTPException(status_code=500, detail="更新退款狀態失敗")
+
+
+@router.post("/order/{order_id}/cancel")
+async def cancel_order_by_admin(
+    order_id: int,
+    current_user: dict = Depends(require_admin),
+    db: asyncpg.Connection = Depends(get_connection),
+):
+    try:
+        result = await cancel_order(order_id, db)
+        return result
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        print(f"取消訂單失敗: {e}")
+        raise HTTPException(status_code=500, detail="取消訂單失敗")

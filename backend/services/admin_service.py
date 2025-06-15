@@ -1,6 +1,10 @@
 from fastapi import HTTPException
 from typing import Optional
 from services.booking_service import get_user_orders_service
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+TAIPEI_TZ = ZoneInfo("Asia/Taipei")
 
 
 async def get_all_orders_service(
@@ -54,7 +58,10 @@ async def get_all_orders_service(
             order_dict["booking_slots"] = [dict(slot) for slot in slots]
             if order_dict["equipment_details"]:
                 import json
-                order_dict["equipment_details"] = json.loads(order_dict["equipment_details"])
+
+                order_dict["equipment_details"] = json.loads(
+                    order_dict["equipment_details"]
+                )
             else:
                 order_dict["equipment_details"] = None
             result.append(order_dict)
@@ -113,3 +120,115 @@ async def get_user_orders_service_by_admin(user_id: int, db):
     except Exception as e:
         print(f"獲取使用者訂單列表失敗：{e}")
         raise HTTPException(status_code=500, detail="獲取使用者訂單列表失敗")
+
+
+async def update_order_refund_status(order_id: int, refund_user: str, db):
+    try:
+        async with db.transaction():
+            select_query = "SELECT id, order_number, payment_status, notes From orders WHERE id = $1"
+            order = await db.fetchrow(
+                select_query,
+                order_id,
+            )
+            if not order:
+                raise HTTPException(status_code=404, detail="使用者不存在")
+            if order["payment_status"] != "paid":
+                raise HTTPException(
+                    status_code=400, detail="無法對未付款訂單進行此操作"
+                )
+            if order["status"] in ["completed", "cancelled"]:
+                raise HTTPException(
+                    status_code=400, detail=f"訂單狀態為 '{order["status"]}'，無法退款"
+                )
+            refund_time = datetime.now(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M")
+            refund_note = f"[退款記錄] 退款人：{refund_user}，退款時間：{refund_time}"
+            existing_notes = order["notes"] or ""
+            new_notes = existing_notes + refund_note
+            update_query = "UPDATE orders SET payment_status = 'refunded', notes = $2, updated_at = NOW() WHERE id = $1"
+            await db.execute(update_query, order_id, new_notes)
+            return {
+                "success": True,
+                "message": f"訂單 {order["order_number"]} 退款狀態已更新",
+                "refund_user": refund_user,
+                "refund_time": refund_time,
+            }
+    except Exception as e:
+        print(f"更新退款狀態失敗：{e}")
+        raise HTTPException(status_code=500, detail="更新退款狀態失敗")
+
+
+async def cancel_order(order_id: int, db):
+    try:
+        async with db.transaction():
+            select_query = """
+                SELECT o.*, st.name as service_type, st.base_duration_hours, st.additional_duration_hours
+                FROM orders o 
+                JOIN service_types st ON o.service_type_id = st.id 
+                WHERE o.id = $1
+            """
+            order = await db.fetchrow(select_query, order_id)
+            if not order:
+                raise HTTPException(status_code=404, detail="訂單不存在")
+            if order["status"] in ["completed", "cancelled"]:
+                raise HTTPException(
+                    status_code=400, detail=f"訂單狀態為 '{order["status"]}'，無法取消"
+                )
+            if order["payment_status"] == "unpaid":
+                raise HTTPException(
+                    status_code=400, detail="未付款訂單會自動清理，無需手動取消"
+                )
+            if order["payment_status"] != "refunded":
+                raise HTTPException(status_code=400, detail="請先執行退款程序")
+            if (
+                order["service_type"] == "REPAIR"
+                and order["status"] == "pending_schedule"
+            ):
+                update_query = "UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1"
+                await db.execute(update_query, order_id)
+                return {
+                    "success": True,
+                    "message": f"訂單 {order['order_number']} 已成功取消",
+                    "cleaned_locks": 0
+                }
+            else:
+                cleaned_locks_count = await cleanup_all_order_locks(order_id, db)
+                delete_query = "DELETE FROM daily_workforce_usage WHERE schedule_id IN (SELECT id FROM schedules WHERE order_id = $1)"
+                await db.execute(delete_query, order_id)
+                delete_query = "DELETE FROM schedules WHERE order_id = $1"
+                await db.execute(delete_query, order_id)
+                update_query = "UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1"
+                await db.execute(update_query, order_id)
+                return {
+                    "success": True,
+                    "message": f"訂單 {order['order_number']} 已成功取消",
+                    "cleaned_locks": cleaned_locks_count
+                }
+    except Exception as e:
+        print(f"取消訂單失敗：{e}")
+        raise HTTPException(status_code=500, detail="取消訂單失敗")
+
+async def cleanup_all_order_locks(order_id: int, db):
+    try:
+        delete_query = """
+            DELETE FROM time_slot_locks tsl
+            WHERE 
+                tsl.reference_id IN (
+                    SELECT id FROM schedules WHERE order_id = $1
+                )
+                OR
+                tsl.id IN (
+                    SELECT DISTINCT temp_lock_id 
+                    FROM booking_slots 
+                    WHERE order_id = $1 AND temp_lock_id IS NOT NULL
+                )
+        """
+        result = await db.execute(delete_query, order_id)
+        cleaned_count = 0
+        if result and "DELETE" in result:
+            cleaned_count = int(result.split()[1])
+        
+        print(f"訂單 {order_id} 清理了 {cleaned_count} 個鎖定記錄")
+        return cleaned_count
+    except Exception as e:
+        print(f"清理訂單 {order_id} 鎖定時發生錯誤: {e}")
+        return 0
