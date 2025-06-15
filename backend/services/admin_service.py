@@ -117,6 +117,8 @@ async def get_user_orders_service_by_admin(user_id: int, db):
             "user": {"id": user["id"], "name": user["name"], "email": user["email"]},
             "orders": orders,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"獲取使用者訂單列表失敗：{e}")
         raise HTTPException(status_code=500, detail="獲取使用者訂單列表失敗")
@@ -125,7 +127,7 @@ async def get_user_orders_service_by_admin(user_id: int, db):
 async def update_order_refund_status(order_id: int, refund_user: str, db):
     try:
         async with db.transaction():
-            select_query = "SELECT id, order_number, payment_status, notes From orders WHERE id = $1"
+            select_query = "SELECT id, order_number, status, payment_status, notes FROM orders WHERE id = $1"
             order = await db.fetchrow(
                 select_query,
                 order_id,
@@ -152,6 +154,8 @@ async def update_order_refund_status(order_id: int, refund_user: str, db):
                 "refund_user": refund_user,
                 "refund_time": refund_time,
             }
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"更新退款狀態失敗：{e}")
         raise HTTPException(status_code=500, detail="更新退款狀態失敗")
@@ -203,6 +207,8 @@ async def cancel_order(order_id: int, db):
                     "message": f"訂單 {order['order_number']} 已成功取消",
                     "cleaned_locks": cleaned_locks_count
                 }
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"取消訂單失敗：{e}")
         raise HTTPException(status_code=500, detail="取消訂單失敗")
