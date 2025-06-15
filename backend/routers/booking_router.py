@@ -41,7 +41,7 @@ async def get_order_detail(order_id: int, current_user: dict = Depends(require_a
         raise HTTPException(status_code=500, detail="取得訂單詳情失敗")
     
 
-@router.post("/order/{order_id}/cancel-request")
+@router.patch("/order/{order_id}/cancel-request")
 async def request_cancel_order(
     order_id: int, 
     current_user: dict = Depends(require_auth), 

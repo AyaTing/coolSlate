@@ -130,7 +130,7 @@ export const requestCancelOrder = async (
 ): Promise<{ message: string }> => {
   return apiCall<{ message: string }>(
     `/order/${orderId}/cancel-request`,
-    { method: "POST" },
+    { method: "PATCH" },
     true
   );
 };
