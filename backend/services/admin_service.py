@@ -215,26 +215,56 @@ async def cancel_order(order_id: int, db):
 
 async def cleanup_all_order_locks(order_id: int, db):
     try:
-        delete_query = """
-            DELETE FROM time_slot_locks tsl
-            WHERE 
-                tsl.reference_id IN (
-                    SELECT id FROM schedules WHERE order_id = $1
-                )
-                OR
-                tsl.id IN (
-                    SELECT DISTINCT temp_lock_id 
-                    FROM booking_slots 
-                    WHERE order_id = $1 AND temp_lock_id IS NOT NULL
-                )
+        select_query = """
+                SELECT DISTINCT 
+                    tsl.id,
+                    tsl.lock_type,
+                    tsl.reference_id,
+                    tsl.slot_date,
+                    tsl.slot_time,
+                    CASE 
+                        WHEN tsl.reference_id IN (SELECT id FROM schedules WHERE order_id = $1) 
+                        THEN 'schedule_lock'
+                        WHEN tsl.id IN (SELECT temp_lock_id FROM booking_slots WHERE order_id = $1 AND temp_lock_id IS NOT NULL)
+                        THEN 'booking_lock'
+                        ELSE 'unknown'
+                    END as lock_source
+                FROM time_slot_locks tsl
+                WHERE 
+                    tsl.reference_id IN (
+                        SELECT id FROM schedules WHERE order_id = $1
+                    )
+                    OR
+                    tsl.id IN (
+                        SELECT temp_lock_id 
+                        FROM booking_slots 
+                        WHERE order_id = $1 AND temp_lock_id IS NOT NULL
+                    )
+            """
+        lock_records = await db.fetch(select_query, order_id)
+        if not lock_records:
+            print(f"訂單 {order_id} 沒有需要清理的鎖定記錄")
+            return 0
+        update_query = """
+            UPDATE booking_slots 
+            SET temp_lock_id = NULL, 
+                is_locked = false, 
+                lock_expires_at = NULL
+            WHERE order_id = $1 AND temp_lock_id IS NOT NULL
         """
-        result = await db.execute(delete_query, order_id)
-        cleaned_count = 0
-        if result and "DELETE" in result:
-            cleaned_count = int(result.split()[1])
-        
-        print(f"訂單 {order_id} 清理了 {cleaned_count} 個鎖定記錄")
-        return cleaned_count
+        await db.execute(update_query, order_id)
+        lock_ids = [record['id'] for record in lock_records]
+        if lock_ids:
+            delete_query = "DELETE FROM time_slot_locks WHERE id = ANY($1)"
+            delete_result = await db.execute(delete_query, lock_ids)
+            deleted_count = 0
+            if delete_result and "DELETE" in delete_result:
+                deleted_count = int(delete_result.split()[1])
+            print(f"成功刪除 {deleted_count} 個鎖定記錄")
+            if deleted_count != len(lock_ids):
+                print(f"警告：預期刪除 {len(lock_ids)} 個，實際刪除 {deleted_count} 個")
+            return deleted_count
+        return 0       
     except Exception as e:
         print(f"清理訂單 {order_id} 鎖定時發生錯誤: {e}")
         return 0
