@@ -1,10 +1,36 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from typing import Optional
 from services.booking_service import get_user_orders_service
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import os
+import boto3
+from botocore.exceptions import ClientError
+import uuid
+from dotenv import load_dotenv
+
+load_dotenv()
 
 TAIPEI_TZ = ZoneInfo("Asia/Taipei")
+
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+AWS_REGION = os.getenv("AWS_REGION")
+CLOUDFRONT_DOMAIN = os.getenv("CLOUDFRONT_DOMAIN")
+
+if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+        region_name=AWS_REGION,
+    )
+else:
+    s3_client = boto3.client(
+        "s3",
+        region_name=AWS_REGION,
+    )
 
 
 async def get_all_orders_service(
@@ -192,7 +218,7 @@ async def cancel_order(order_id: int, db):
                 return {
                     "success": True,
                     "message": f"訂單 {order['order_number']} 已成功取消",
-                    "cleaned_locks": 0
+                    "cleaned_locks": 0,
                 }
             else:
                 cleaned_locks_count = await cleanup_all_order_locks(order_id, db)
@@ -205,13 +231,14 @@ async def cancel_order(order_id: int, db):
                 return {
                     "success": True,
                     "message": f"訂單 {order['order_number']} 已成功取消",
-                    "cleaned_locks": cleaned_locks_count
+                    "cleaned_locks": cleaned_locks_count,
                 }
     except HTTPException:
         raise
     except Exception as e:
         print(f"取消訂單失敗：{e}")
         raise HTTPException(status_code=500, detail="取消訂單失敗")
+
 
 async def cleanup_all_order_locks(order_id: int, db):
     try:
@@ -253,7 +280,7 @@ async def cleanup_all_order_locks(order_id: int, db):
             WHERE order_id = $1 AND temp_lock_id IS NOT NULL
         """
         await db.execute(update_query, order_id)
-        lock_ids = [record['id'] for record in lock_records]
+        lock_ids = [record["id"] for record in lock_records]
         if lock_ids:
             delete_query = "DELETE FROM time_slot_locks WHERE id = ANY($1)"
             delete_result = await db.execute(delete_query, lock_ids)
@@ -264,7 +291,113 @@ async def cleanup_all_order_locks(order_id: int, db):
             if deleted_count != len(lock_ids):
                 print(f"警告：預期刪除 {len(lock_ids)} 個，實際刪除 {deleted_count} 個")
             return deleted_count
-        return 0       
+        return 0
     except Exception as e:
         print(f"清理訂單 {order_id} 鎖定時發生錯誤: {e}")
         return 0
+
+
+async def upload_completion_file(order_id: int, file: UploadFile, db):
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="只允許上傳 PDF 檔案")
+    if file.size > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="檔案大小不能超過 10MB")
+    try:
+        async with db.transaction():
+            select_query = "SELECT id, order_number, status FROM orders WHERE id = $1"
+            order = await db.fetchrow(select_query, order_id)
+            if not order:
+                raise HTTPException(status_code=404, detail="訂單不存在")
+            if order["status"] != "scheduled":
+                raise HTTPException(
+                    status_code=400, detail="只有已排程的訂單可以上傳完工報告"
+                )
+            s3_object_name = f"{order["order_number"]}_{uuid.uuid4().hex}_report.pdf"
+            try:
+                s3_client.upload_fileobj(
+                    file.file,
+                    S3_BUCKET_NAME,
+                    s3_object_name,
+                    ExtraArgs={
+                        "ContentType": "application/pdf",
+                        "ContentDisposition": f"inline; filename={file.filename}",
+                    },
+                )
+            except ClientError as err:
+                print(f"S3返回錯誤回應：{err}")
+                raise HTTPException(
+                    status_code=500, detail="S3返回錯誤回應，檔案上傳失敗"
+                )
+            file_url = f"{CLOUDFRONT_DOMAIN}/{s3_object_name}"
+            select_query = (
+                "SELECT completion_file_url FROM order_completions WHERE order_id = $1"
+            )
+            existing = await db.fetchrow(select_query, order_id)
+            if existing:
+                update_query = "UPDATE order_completions SET completion_file_url = $2, completion_file_name = $3 WHERE order_id = $1"
+                await db.execute(update_query, order_id, file_url, file.filename)
+                message = f"訂單 {order['order_number']} 驗收報告已更新"
+            else:
+                insert_query = "INSERT INTO order_completions(order_id, completion_file_url, completion_file_name) VALUES ($1, $2, $3)"
+                await db.execute(insert_query, order_id, file_url, file.filename)
+                message = f"訂單 {order['order_number']} 完工報告上傳成功"
+            return {
+                "success": True,
+                "message": message,
+                "completion_file_name": file.filename,
+                "completion_file_url": file_url,
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"上傳完工報告失敗: {e}")
+        raise HTTPException(status_code=500, detail="上傳完工報告失敗")
+
+
+async def update_order_completion_status(order_id: int, db):
+    try:
+        async with db.transaction():
+            select_query = "SELECT id, order_number, status FROM orders WHERE id = $1"
+            order = await db.fetchrow(select_query, order_id)
+            if not order:
+                raise HTTPException(status_code=404, detail="訂單不存在")
+            select_query = (
+                "SELECT completion_file_url FROM order_completions WHERE order_id = $1"
+            )
+            existing = await db.fetchrow(select_query, order_id)
+            if not existing:
+                raise HTTPException(status_code=400, detail="請上傳驗收報告")
+            update_query = "UPDATE orders SET status = 'completed', updated_at = NOW() WHERE id = $1"
+            await db.execute(update_query, order_id)
+            return {
+                "success": True,
+                "message": f"訂單 {order["order_number"]} 已完工",
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"更新完工狀態失敗：{e}")
+        raise HTTPException(status_code=500, detail="更新完工狀態失敗")
+
+
+async def get_completion_file(order_id: int, db):
+    try:
+        select_query = "SELECT id, order_number, status FROM orders WHERE id = $1"
+        order = await db.fetchrow(select_query, order_id)
+        if not order:
+            raise HTTPException(status_code=404, detail="訂單不存在")
+        select_query = "SELECT completion_file_url, completion_file_name FROM order_completions WHERE order_id = $1"
+        report = await db.fetchrow(select_query, order_id)
+        if not report:
+            raise HTTPException(status_code=404, detail="該訂單尚未上傳完工報告")
+        return {
+            "order_id": order_id,
+            "order_number": order["order_number"],
+            "completion_file_url": report["completion_file_url"],
+            "completion_file_name": report["completion_file_name"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"取得驗收報告失敗：{e}")
+        raise HTTPException(status_code=500, detail="取得驗收報告失敗")

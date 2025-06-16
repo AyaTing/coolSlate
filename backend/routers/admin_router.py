@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, UploadFile, File
 from utils.auth import require_admin, get_connection
 from services.admin_service import (
     get_all_orders_service,
@@ -6,6 +6,9 @@ from services.admin_service import (
     get_user_orders_service_by_admin,
     cancel_order,
     update_order_refund_status,
+    upload_completion_file, 
+    get_completion_file, 
+    update_order_completion_status
 )
 from services.booking_service import get_order_detail_service
 from services.scheduling_service import process_immediate_scheduling
@@ -124,3 +127,52 @@ async def cancel_order_by_admin(
     except Exception as e:
         print(f"取消訂單失敗: {e}")
         raise HTTPException(status_code=500, detail="取消訂單失敗")
+    
+
+@router.post("/order/{order_id}/completion")
+async def upload_order_completion(
+    order_id: int,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(require_admin),
+    db: asyncpg.Connection = Depends(get_connection)
+):
+    try:
+        result = await upload_completion_file(order_id, file, db)
+        return result
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        print(f"上傳完工報告失敗: {e}")
+        raise HTTPException(status_code=500, detail="上傳完工報告失敗")
+
+
+@router.get("/order/{order_id}/completion")
+async def get_order_completion(
+    order_id: int,
+    current_user: dict = Depends(require_admin),
+    db: asyncpg.Connection = Depends(get_connection)
+):
+    try:
+        result = await get_completion_file(order_id, db)
+        return result
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        print(f"取得完工報告失敗: {e}")
+        raise HTTPException(status_code=500, detail="取得完工報告失敗")
+
+
+@router.patch("/order/{order_id}/completion")
+async def update_completion_status(
+    order_id: int,
+    current_user: dict = Depends(require_admin),
+    db: asyncpg.Connection = Depends(get_connection),
+):
+    try:
+        result = await update_order_completion_status(order_id, db)
+        return result
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        print(f"更新完工狀態失敗: {e}")
+        raise HTTPException(status_code=500, detail="更新完工狀態失敗")
