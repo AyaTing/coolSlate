@@ -6,6 +6,8 @@ import {
   getOrderByAdmin,
   getUserOrdersByAdmin,
   scheduleOrderByAdmin,
+  cancelOrderByAdmin,
+  updateRefundStatusByAdmin,
 } from "../services/adminAPI";
 import { type OrderDetail } from "../services/orderAPI";
 import {
@@ -28,6 +30,13 @@ interface OrderCardProps {
   order: OrderDetail;
   onClick: () => void;
 }
+interface RefundConfirmModalProps {
+  show: boolean;
+  refundUser: string;
+  onRefundUserChange: (value: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
 
 const adminOptions: AdminOptionsType[] = ["未完工追蹤", "會員名冊", "訂單總表"];
 const caseTags: CaseTagType[] = [
@@ -37,6 +46,50 @@ const caseTags: CaseTagType[] = [
   "二週以上",
   "取消申請中",
 ];
+
+const RefundConfirmModal: React.FC<RefundConfirmModalProps> = ({
+  show,
+  refundUser,
+  onRefundUserChange,
+  onConfirm,
+  onCancel,
+}) => {
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 bg-[var(--color-text-primary)]/10 flex items-center justify-center z-50">
+      <div className="bg-[var(--color-bg-card-secondary)] p-6 rounded-lg max-w-md w-full mx-4">
+        <h3 className="text-lg font-bold mb-4">是否已處理退款手續？</h3>
+        <div className="mb-6">
+          <label className="block mb-2 text-[var(--color-text-primary)]">
+            退款處理人員：
+          </label>
+          <input
+            type="text"
+            placeholder="請輸入姓名"
+            value={refundUser}
+            onChange={(e) => onRefundUserChange(e.target.value)}
+            className="w-full px-4 py-2 border text-[var(--color-text-primary)] rounded"
+            autoFocus
+          />
+        </div>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 bg-[var(--color-brand-primary)] text-[var(--color-text-secondary)] rounded"
+          >
+            取消
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 bg-red-500 opacity-70 text-[var(--color-text-secondary)] rounded"
+          >
+            確認已退款
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const AdminPage = () => {
   const [selectedOption, setSelectedOption] =
@@ -50,6 +103,9 @@ const AdminPage = () => {
   const [paymentStatus, setPaymentStatus] = useState<string>("");
   const [serviceType, setServiceType] = useState<string>("");
   const [isScheduling, setIsScheduling] = useState(false);
+  const [showRefundConfirm, setShowRefundConfirm] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [refundUser, setRefundUser] = useState("");
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -123,6 +179,93 @@ const AdminPage = () => {
     }
   };
 
+  const refundConfirmModal = () => {
+    setShowRefundConfirm(true);
+  };
+  const cancelConfirmModal = () => {
+    setShowCancelConfirm(true);
+  };
+
+  const handleConfirmRefund = async () => {
+    if (!refundUser.trim()) {
+      alert("請輸入退款處理人員姓名");
+      return;
+    }
+    try {
+      const result = await updateRefundStatusByAdmin(
+        orderDetail!.order_id,
+        refundUser
+      );
+      if (result.success) {
+        alert(result.message);
+        setShowRefundConfirm(false);
+        setRefundUser("");
+        queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === "admin-orders" ||
+            query.queryKey[0] === "admin-order-detail" ||
+            query.queryKey[0] === "admin-user-orders",
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      alert("退款狀態修改失敗，請重試");
+    }
+  };
+
+  const handleCancelRefund = () => {
+    setShowRefundConfirm(false);
+    setRefundUser("");
+  };
+
+  const CancelConfirmModal = () => {
+    if (!showCancelConfirm || !orderDetail) return null;
+    const handleConfirmCancel = async () => {
+      try {
+        const result = await cancelOrderByAdmin(orderDetail!.order_id);
+        if (result.success) {
+          alert(result.message);
+          queryClient.invalidateQueries({
+            predicate: (query) =>
+              query.queryKey[0] === "admin-orders" ||
+              query.queryKey[0] === "admin-order-detail" ||
+              query.queryKey[0] === "admin-user-orders",
+          });
+          setShowCancelConfirm(false);
+          setOrderId(null);
+        }
+      } catch (error) {
+        console.error(error);
+        alert("取消訂單失敗，請重試");
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-[var(--color-text-primary)]/10 flex items-center justify-center z-50 ">
+        <div className="bg-[var(--color-bg-card-secondary)]  p-6 rounded-lg max-w-md w-full mx-4">
+          <h3 className="text-lg font-bold mb-4">取消訂單</h3>
+          <p className="mb-6 text-[var(--color-text-primary)]">
+            確定要取消訂單 {orderDetail!.order_number} 嗎？此操作無法復原。
+          </p>
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={() => setShowCancelConfirm(false)}
+              className="px-4 py-2 bg-[var(--color-brand-primary)] text-[var(--color-text-secondary)] rounded"
+            >
+              關閉
+            </button>
+            <button
+              onClick={handleConfirmCancel}
+              className="px-4 py-2 bg-red-500 opacity-70 text-[var(--color-text-secondary)] rounded"
+            >
+              取消訂單
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const OrderCard = ({ order, onClick }: OrderCardProps) => {
     const today = new Date();
     const bookingDateStr = order.booking_slots[0]?.preferred_date;
@@ -167,7 +310,17 @@ const AdminPage = () => {
             <p>服務類型：{toFrontendServiceType(orderDetail.service_type)}</p>
             <p>服務狀態：{toFrontendOrderStatus(orderDetail.status)}</p>
             <p>
-              付款狀態：{toFrontendPaymentStatus(orderDetail.payment_status)}
+              付款狀態：{toFrontendPaymentStatus(orderDetail.payment_status)}{" "}
+              {orderDetail.payment_status === "paid" &&
+                orderDetail.status !== "completed" &&
+                orderDetail.status !== "cancelled" && (
+                  <button
+                    onClick={refundConfirmModal}
+                    className="mx-1 px-2 py-1 bg-red-500 opacity-70 text-[var(--color-text-secondary)] rounded"
+                  >
+                    退款
+                  </button>
+                )}
             </p>
             <p>預約日期：{orderDetail.booking_slots[0]?.preferred_date}</p>
             <p>
@@ -178,14 +331,29 @@ const AdminPage = () => {
             <p>聯絡電話：{orderDetail.booking_slots[0]?.contact_phone}</p>
             <p>金額：NT$ {orderDetail.total_amount}</p>
           </div>
-          {orderDetail.status === "precancel" && (
+          {orderDetail.status === "precancel" &&
+            orderDetail.payment_status !== "refunded" && (
+              <p className="mt-4 font-bold text-red-500 opacity-70">
+                需先進行退款處理。
+              </p>
+            )}
+          {orderDetail.payment_status == "refunded" && (
             <p className="mt-4 font-bold text-red-500 opacity-70">
-              需先進行退款處理。
+              已退款完成。
             </p>
           )}
           <div className="flex gap-2 mt-4 justify-between">
-            {(orderDetail.status === "pending_schedule" ||
-              orderDetail.status === "paid") &&
+            {orderDetail.payment_status === "refunded" &&
+              orderDetail.status !== "cancelled" && (
+                <button
+                  onClick={cancelConfirmModal}
+                  className="px-4 py-2 bg-[var(--color-text-tertiary)]/10 text-[var(--color-text-primary)] rounded"
+                >
+                  取消訂單
+                </button>
+              )}
+
+            {orderDetail.status === "pending_schedule" &&
               orderDetail.payment_status === "paid" && (
                 <button
                   onClick={() => handleScheduleOrder(orderDetail.order_id)}
@@ -510,6 +678,14 @@ const AdminPage = () => {
         <div className="bg-gradient-to-br from-[var(--color-brand-primary-light)]/10 via-transparent to-[var(--color-bg-main)]  rounded-lg shadow-md p-6">
           {adminContent()}
           <OrderModal />
+          <RefundConfirmModal
+            show={showRefundConfirm}
+            refundUser={refundUser}
+            onRefundUserChange={setRefundUser}
+            onConfirm={handleConfirmRefund}
+            onCancel={handleCancelRefund}
+          />
+          <CancelConfirmModal />
         </div>
       </div>
     </div>

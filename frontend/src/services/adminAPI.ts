@@ -32,6 +32,16 @@ interface AdminScheduleOrderResponse {
   estimated_end_time: string;
   email_sent: boolean;
 }
+interface AdminRefundResponse {
+  success: boolean;
+  message: string;
+  refund_user: string;
+  refund_time: string;
+}
+interface AdminCancelOrderResponse {
+  success: boolean;
+  message: string;
+}
 
 async function apiCall<T>(
   endpoint: string,
@@ -137,6 +147,27 @@ export const scheduleOrderByAdmin = async (
 ): Promise<AdminScheduleOrderResponse> => {
   return apiCall<AdminScheduleOrderResponse>(
     `/admin/scheduling/${orderId}`,
+    { method: "POST" },
+    true
+  );
+};
+
+export const updateRefundStatusByAdmin = async (
+  orderId: number,
+  refundUser: string
+): Promise<AdminRefundResponse> => {
+  return apiCall<AdminRefundResponse>(
+    `/admin/order/${orderId}/refund`,
+    { method: "PATCH", body: JSON.stringify({ refund_user: refundUser }) },
+    true
+  );
+};
+
+export const cancelOrderByAdmin = async (
+  orderId: number
+): Promise<AdminCancelOrderResponse> => {
+  return apiCall<AdminCancelOrderResponse>(
+    `/admin/order/${orderId}/cancel`,
     { method: "POST" },
     true
   );

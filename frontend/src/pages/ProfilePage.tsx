@@ -134,7 +134,7 @@ const ProfilePage = () => {
               預約後若未付款，訂單將會於30分鐘後自動刪除，敬請留意。
             </p>
           )}
-          {orderDetail.payment_status === "refunded" && (
+          {orderDetail.status === "cancelled" && (
             <p className="mt-4 font-bold text-red-500 opacity-70">
               已完成取消及退款作業。
             </p>
