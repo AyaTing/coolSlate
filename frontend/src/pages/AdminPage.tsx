@@ -8,6 +8,9 @@ import {
   scheduleOrderByAdmin,
   cancelOrderByAdmin,
   updateRefundStatusByAdmin,
+  uploadCompletionFileByAdmin,
+  getCompletionFileByAdmin,
+  updateCompletionStatusByAdmin,
 } from "../services/adminAPI";
 import { type OrderDetail } from "../services/orderAPI";
 import {
@@ -36,6 +39,13 @@ interface RefundConfirmModalProps {
   onRefundUserChange: (value: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
+}
+
+interface CompletionUploaModalProps {
+  show: boolean;
+  onUpload: (file: File) => void;
+  onCancel: () => void;
+  isUploading?: boolean;
 }
 
 const adminOptions: AdminOptionsType[] = ["未完工追蹤", "會員名冊", "訂單總表"];
@@ -91,6 +101,79 @@ const RefundConfirmModal: React.FC<RefundConfirmModalProps> = ({
   );
 };
 
+const CompletionUploadModal: React.FC<CompletionUploaModalProps> = ({
+  show,
+  onUpload,
+  onCancel,
+  isUploading,
+}) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  if (!show) return null;
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.includes("pdf")) {
+        alert("請選擇 PDF 檔案");
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        alert("檔案大小不能超過 10MB");
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+  const handleUpload = () => {
+    if (!selectedFile) {
+      alert("請選擇檔案");
+      return;
+    }
+    onUpload(selectedFile);
+    setSelectedFile(null);
+  };
+  return (
+    <div className="fixed inset-0 bg-[var(--color-text-primary)]/10 flex items-center justify-center z-50">
+      <div className="bg-[var(--color-bg-card-secondary)] p-6 rounded-lg max-w-md w-full mx-4">
+        <h3 className="text-lg font-bold mb-4">上傳驗收報告</h3>
+        <div className="mb-6">
+          <label className="block mb-2 text-[var(--color-text-primary)] ">
+            選擇 PDF 檔案：
+          </label>
+          <input
+            type="file"
+            accept=".pdf,application/pdf"
+            onChange={handleFileSelect}
+            disabled={isUploading}
+            className="w-full px-4 py-2 border  text-[var(--color-text-primary)] rounded"
+          />
+          {selectedFile && (
+            <div className="mt-2 text-sm text-[var(--color-text-tertiary)]">
+              已選擇：{selectedFile.name} (
+              {(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+            </div>
+          )}
+        </div>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            disabled={isUploading}
+            className="px-4 py-2  bg-red-500 opacity-70 text-[var(--color-text-secondary)] rounded"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleUpload}
+            disabled={!selectedFile || isUploading}
+            className="px-4 py-2 bg-[var(--color-brand-primary)] text-[var(--color-text-secondary)] rounded"
+          >
+            {isUploading ? "上傳中..." : "上傳檔案"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AdminPage = () => {
   const [selectedOption, setSelectedOption] =
     useState<AdminOptionsType>("未完工追蹤");
@@ -105,6 +188,15 @@ const AdminPage = () => {
   const [isScheduling, setIsScheduling] = useState(false);
   const [showRefundConfirm, setShowRefundConfirm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showCompletionUpload, setShowCompletionUpload] = useState(false);
+  const [completionFileInfo, setCompletionFileInfo] = useState<{
+    order_id: number;
+    order_number: string;
+    completion_file_name: string;
+    completion_file_url: string;
+  } | null>(null);
+  const [showCompletionView, setShowCompletionView] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [refundUser, setRefundUser] = useState("");
   const queryClient = useQueryClient();
 
@@ -152,6 +244,102 @@ const AdminPage = () => {
     enabled: !!userId,
   });
 
+  const refundConfirmModal = () => {
+    setShowRefundConfirm(true);
+  };
+  const cancelConfirmModal = () => {
+    setShowCancelConfirm(true);
+  };
+
+  const completionUploadModal = () => {
+    setShowCompletionUpload(true);
+  };
+
+  const handleCancelRefund = () => {
+    setShowRefundConfirm(false);
+    setRefundUser("");
+  };
+
+  const handleCancelUpload = () => {
+    setShowCompletionUpload(false);
+  };
+
+  const handleViewCompletion = async (orderId: number) => {
+    try {
+      const result = await getCompletionFileByAdmin(orderId);
+      setCompletionFileInfo(result);
+      setShowCompletionView(true);
+    } catch (error) {
+      console.error("獲取完工報告失敗:", error);
+      alert("獲取完工報告失敗");
+    }
+  };
+
+  const handleMarkCompleted = async () => {
+    if (!orderDetail) return;
+
+    try {
+      const result = await updateCompletionStatusByAdmin(orderDetail.order_id);
+      if (result.success) {
+        alert(result.message);
+        setOrderId(null);
+        queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === "admin-orders" ||
+            query.queryKey[0] === "admin-order-detail" ||
+            query.queryKey[0] === "admin-user-orders",
+        });
+      } else {
+        alert("標記完工失敗，請稍後再試");
+      }
+    } catch (error) {
+      console.error("標記完工錯誤:", error);
+      alert("標記完工失敗，請稍後再試");
+    }
+  };
+
+  const handleCompletionUpload = async (file: File) => {
+    if (!orderDetail) {
+      alert("找不到訂單資訊");
+      return;
+    }
+    try {
+      setIsUploading(true);
+      const result = await uploadCompletionFileByAdmin(
+        orderDetail.order_id,
+        file
+      );
+      if (result.success) {
+        alert(result.message);
+        setOrderId(null);
+        setShowCompletionUpload(false);
+        queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === "admin-orders" ||
+            query.queryKey[0] === "admin-order-detail" ||
+            query.queryKey[0] === "admin-user-orders",
+        });
+        if (orderDetail.status === "scheduled") {
+          const confirmCompletion = confirm(
+            "檔案上傳成功！是否要標記此訂單為已完工？"
+          );
+          if (confirmCompletion) {
+            await handleMarkCompleted();
+          }
+        } else {
+          alert("檔案上傳成功！");
+        }
+      } else {
+        alert("檔案上傳失敗，請稍後再試");
+      }
+    } catch (error) {
+      console.error("檔案上傳錯誤:", error);
+      alert("檔案上傳失敗，請稍後再試");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleScheduleOrder = async (orderId: number) => {
     try {
       setIsScheduling(true);
@@ -177,13 +365,6 @@ const AdminPage = () => {
     } finally {
       setIsScheduling(false);
     }
-  };
-
-  const refundConfirmModal = () => {
-    setShowRefundConfirm(true);
-  };
-  const cancelConfirmModal = () => {
-    setShowCancelConfirm(true);
   };
 
   const handleConfirmRefund = async () => {
@@ -212,9 +393,40 @@ const AdminPage = () => {
     }
   };
 
-  const handleCancelRefund = () => {
-    setShowRefundConfirm(false);
-    setRefundUser("");
+  const CompletionViewModal = () => {
+    if (!showCompletionView || !completionFileInfo) return null;
+
+    return (
+      <div className="fixed inset-0 bg-[var(--color-text-primary)]/10 flex items-center justify-center z-50">
+        <div className="bg-[var(--color-bg-card-secondary)] p-6 rounded-lg max-w-4xl w-full mx-4 h-[90vh] flex flex-col">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="text-lg font-bold">驗收報告</h3>
+              <p className="text-sm text-[var(--color-text-tertiary)]">
+                訂單編號：{completionFileInfo.order_number} | 檔案：
+                {completionFileInfo.completion_file_name}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowCompletionView(false)}
+              className="px-4 py-2 bg-[var(--color-text-tertiary)] text-[var(--color-text-secondary)] rounded hover:opacity-80"
+            >
+              關閉
+            </button>
+          </div>
+
+          <div className="flex-1 border border-gray-300 rounded-lg overflow-hidden">
+            <iframe
+              src={completionFileInfo.completion_file_url}
+              width="100%"
+              height="100%"
+              style={{ border: "none" }}
+              title="驗收報告"
+            />
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const CancelConfirmModal = () => {
@@ -365,6 +577,23 @@ const AdminPage = () => {
                   {isScheduling ? "排程中..." : "排程"}
                 </button>
               )}
+            {orderDetail.status === "scheduled" &&
+              orderDetail.payment_status === "paid" && (
+                <button
+                  onClick={completionUploadModal}
+                  className="px-4 py-2 bg-[var(--color-brand-primary)] text-[var(--color-text-secondary)] rounded"
+                >
+                  驗收
+                </button>
+              )}
+            {orderDetail.status === "completed" && (
+              <button
+                onClick={() => handleViewCompletion(orderDetail.order_id)}
+                className="px-4 py-2 bg-blue-500 text-[var(--color-text-secondary)] rounded"
+              >
+                查看報告
+              </button>
+            )}
             <span></span>
             <button
               onClick={() => setOrderId(null)}
@@ -688,6 +917,13 @@ const AdminPage = () => {
             onCancel={handleCancelRefund}
           />
           <CancelConfirmModal />
+          <CompletionUploadModal
+            show={showCompletionUpload}
+            onUpload={handleCompletionUpload}
+            onCancel={handleCancelUpload}
+            isUploading={isUploading}
+          />
+          <CompletionViewModal />
         </div>
       </div>
     </div>

@@ -58,6 +58,7 @@ interface AdminCompletionResponse {
 
 interface AdminGetFileResponse {
   order_id: number;
+  order_number: string;
   completion_file_name: string;
   completion_file_url: string;
 }
