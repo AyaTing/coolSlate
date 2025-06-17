@@ -1,6 +1,7 @@
 from fastapi import HTTPException, UploadFile
 from typing import Optional
 from services.booking_service import get_user_orders_service
+from services.mail_service import send_cancellation_confirmation_email
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
@@ -215,7 +216,7 @@ async def cancel_order(order_id: int, db):
             ):
                 update_query = "UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1"
                 await db.execute(update_query, order_id)
-                return {
+                result =  {
                     "success": True,
                     "message": f"訂單 {order['order_number']} 已成功取消",
                     "cleaned_locks": 0,
@@ -228,17 +229,39 @@ async def cancel_order(order_id: int, db):
                 await db.execute(delete_query, order_id)
                 update_query = "UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1"
                 await db.execute(update_query, order_id)
-                return {
+                result = {
                     "success": True,
                     "message": f"訂單 {order['order_number']} 已成功取消",
                     "cleaned_locks": cleaned_locks_count,
                 }
+            email_sent = False
+            try:
+                select_query = "SELECT u.email, u.name FROM users u JOIN orders o ON u.id = o.user_id WHERE o.id = $1"
+                user = await db.fetchrow(select_query, order_id)
+                if user:
+                    order_data  = {
+                    "order_id": order_id,
+                    "order_number": order["order_number"],
+                    "service_type": order["service_type"],
+                    "location_address": order["location_address"],
+                    "total_amount": order["total_amount"],
+                    "preferred_date": order.get("preferred_date"),
+                    "preferred_time": order.get("preferred_time"),
+                    "user_email": user["email"],
+                    "user_name": user["name"]
+                }
+                mail_result = send_cancellation_confirmation_email(order_data)
+                email_sent = mail_result.get("success", False)
+            except Exception as email_error:
+                print(f"郵件發送失敗，但排程已成功: {email_error}")
+            result["email_sent"] = email_sent
+            return result
     except HTTPException:
         raise
     except Exception as e:
         print(f"取消訂單失敗：{e}")
         raise HTTPException(status_code=500, detail="取消訂單失敗")
-
+    
 
 async def cleanup_all_order_locks(order_id: int, db):
     try:

@@ -41,19 +41,41 @@ interface AdminRefundResponse {
 interface AdminCancelOrderResponse {
   success: boolean;
   message: string;
+  email_sent: boolean;
+}
+
+interface AdminUploadFileResponse {
+  success: boolean;
+  message: string;
+  completion_file_name: string;
+  completion_file_url: string;
+}
+
+interface AdminCompletionResponse {
+  success: boolean;
+  message: string;
+}
+
+interface AdminGetFileResponse {
+  order_id: number;
+  completion_file_name: string;
+  completion_file_url: string;
 }
 
 async function apiCall<T>(
   endpoint: string,
   options?: RequestInit,
-  requireAuth = false
+  requireAuth = false,
+  isFormData = false
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     Accept: "application/json",
     ...((options?.headers as Record<string, string>) || {}),
   };
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (requireAuth) {
     const token = localStorage.getItem("auth_token");
@@ -169,6 +191,40 @@ export const cancelOrderByAdmin = async (
   return apiCall<AdminCancelOrderResponse>(
     `/admin/order/${orderId}/cancel`,
     { method: "POST" },
+    true
+  );
+};
+
+export const uploadCompletionFileByAdmin = async (
+  orderId: number,
+  file: File
+): Promise<AdminUploadFileResponse> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiCall<AdminUploadFileResponse>(
+    `/admin/order/${orderId}/completion`,
+    { method: "POST", body: formData },
+    true,
+    true
+  );
+};
+
+export const updateCompletionStatusByAdmin = async (
+  orderId: number
+): Promise<AdminCompletionResponse> => {
+  return apiCall<AdminCompletionResponse>(
+    `/admin/order/${orderId}/completion`,
+    { method: "PATCH" },
+    true
+  );
+};
+
+export const getCompletionFileByAdmin = async (
+  orderId: number
+): Promise<AdminGetFileResponse> => {
+  return apiCall<AdminGetFileResponse>(
+    `/admin/order/${orderId}/completion`,
+    {},
     true
   );
 };

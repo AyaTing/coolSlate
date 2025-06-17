@@ -197,7 +197,6 @@ const AdminPage = () => {
         refundUser
       );
       if (result.success) {
-        alert(result.message);
         setShowRefundConfirm(false);
         setRefundUser("");
         queryClient.invalidateQueries({
@@ -224,7 +223,10 @@ const AdminPage = () => {
       try {
         const result = await cancelOrderByAdmin(orderDetail!.order_id);
         if (result.success) {
-          alert(result.message);
+          const emailStatus = result.email_sent
+            ? "郵件已發送！"
+            : "郵件發送失敗，請通知會員。";
+          alert(`${result.message}${emailStatus}`);
           queryClient.invalidateQueries({
             predicate: (query) =>
               query.queryKey[0] === "admin-orders" ||
