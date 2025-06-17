@@ -226,7 +226,7 @@ const AdminPage = () => {
           const emailStatus = result.email_sent
             ? "郵件已發送！"
             : "郵件發送失敗，請通知會員。";
-          alert(`${result.message}${emailStatus}`);
+          alert(`${result.message}，${emailStatus}`);
           queryClient.invalidateQueries({
             predicate: (query) =>
               query.queryKey[0] === "admin-orders" ||

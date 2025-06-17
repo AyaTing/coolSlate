@@ -238,6 +238,8 @@ async def cancel_order(order_id: int, db):
             try:
                 select_query = "SELECT u.email, u.name FROM users u JOIN orders o ON u.id = o.user_id WHERE o.id = $1"
                 user = await db.fetchrow(select_query, order_id)
+                select_query = "SELECT preferred_date, preferred_time FROM booking_slots WHERE order_id = $1 ORDER BY is_selected DESC, is_primary DESC, preferred_date, preferred_time LIMIT 1"
+                booking_slot = await db.fetchrow(select_query, order_id)
                 if user:
                     order_data  = {
                     "order_id": order_id,
@@ -245,8 +247,8 @@ async def cancel_order(order_id: int, db):
                     "service_type": order["service_type"],
                     "location_address": order["location_address"],
                     "total_amount": order["total_amount"],
-                    "preferred_date": order.get("preferred_date"),
-                    "preferred_time": order.get("preferred_time"),
+                    "preferred_date": booking_slot["preferred_date"] if booking_slot else None,
+                    "preferred_time": booking_slot["preferred_time"] if booking_slot else None,
                     "user_email": user["email"],
                     "user_name": user["name"]
                 }
