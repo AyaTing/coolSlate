@@ -499,6 +499,9 @@ const AdminPage = () => {
           <span className="ml-1 font-bold text-red-500 opacity-70">
             {bookingDate < today ? "已過期" : ""}
           </span>
+          <span className="ml-1 font-bold text-red-500 opacity-70">
+            {orderDetail?.status === "scheduling_failed" ? "排程失敗" : ""}
+          </span>
         </p>
 
         <p>
@@ -545,6 +548,11 @@ const AdminPage = () => {
             <p>聯絡電話：{orderDetail.booking_slots[0]?.contact_phone}</p>
             <p>金額：NT$ {orderDetail.total_amount}</p>
           </div>
+          {orderDetail.status === "scheduling_failed" && (
+            <p className="mt-4 font-bold text-red-500 opacity-70">
+              {orderDetail.scheduling_feedback}
+            </p>
+          )}
           {orderDetail.status === "precancel" &&
             orderDetail.payment_status !== "refunded" && (
               <p className="mt-4 font-bold text-red-500 opacity-70">
@@ -623,7 +631,7 @@ const AdminPage = () => {
           case "等待排程":
             return (
               (order.status === "pending_schedule" ||
-                order.status === "paid") &&
+                order.status === "scheduling_failed") &&
               order.payment_status === "paid"
             );
           case "七日內":

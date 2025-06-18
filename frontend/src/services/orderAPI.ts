@@ -24,6 +24,7 @@ export interface OrderDetail {
   }>;
   created_at: string;
   updated_at: string;
+  scheduling_feedback?: string;
 }
 
 const PAYMENT_STATUS_MAP = {
@@ -39,6 +40,7 @@ const ORDER_STATUS_MAP = {
   completed: "已完成",
   cancelled: "已取消",
   precancel: "取消申請中",
+  scheduling_failed: "排程失敗",
 } as const;
 
 export function toFrontendPaymentStatus(backendStatus: string): string {

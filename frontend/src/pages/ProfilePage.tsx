@@ -68,6 +68,9 @@ const ProfilePage = () => {
             {order.payment_status === "unpaid" ? "未付款" : ""}
           </span>
           <span className="ml-1 font-bold text-red-500 opacity-70">
+            {order.status === "scheduling_failed" ? "排程失敗" : ""}
+          </span>
+          <span className="ml-1 font-bold text-red-500 opacity-70">
             {order.status === "cancelled" && order.payment_status === "refunded"
               ? "已取消及退款"
               : ""}
@@ -142,6 +145,11 @@ const ProfilePage = () => {
           {orderDetail.status === "precancel" && (
             <p className="mt-4 font-bold text-red-500 opacity-70">
               專人核對處理中。
+            </p>
+          )}
+          {orderDetail.status === "scheduling_failed" && (
+            <p className="mt-4 font-bold text-red-500 opacity-70">
+              排程失敗，請靜待專人聯繫或主動來電。
             </p>
           )}
           {canCancel() && (
@@ -228,7 +236,9 @@ const ProfilePage = () => {
         switch (status) {
           case "預約中":
             return (
-              order.status === "pending" || order.status === "pending_schedule"
+              order.status === "pending" ||
+              order.status === "pending_schedule" ||
+              order.status === "scheduling_failed"
             );
 
           case "已排程":
