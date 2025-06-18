@@ -217,8 +217,8 @@ async def process_repair_order(order_id: int, db, http_client):
                 if can_book:
                     selected_slot = slot
                     break
-            update_query = "UPDATE orders SET status = 'scheduling_failed', scheduling_feedback = '偏好時段皆已滿' WHERE id = $1"
             if not selected_slot:
+                update_query = "UPDATE orders SET status = 'scheduling_failed', scheduling_feedback = '偏好時段皆已滿' WHERE id = $1"
                 await db.execute(update_query, order_id)
                 return {"success": False, "reason": "時段已滿"}
             required_hours = (

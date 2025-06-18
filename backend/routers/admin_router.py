@@ -12,7 +12,7 @@ from services.admin_service import (
     update_order_completion_status,
 )
 from services.booking_service import get_order_detail_service
-from services.scheduling_service import process_immediate_scheduling
+from services.scheduling_service import process_immediate_scheduling, process_repair_order
 from models.booking_model import OrderDetail
 import asyncpg
 from typing import Optional

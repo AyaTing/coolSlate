@@ -183,7 +183,7 @@ async def daily_repair_scheduling(db, client):
         for order_record in orders:
             try:
                 result = await process_repair_order(order_record['id'], db, client)
-                if result.get("success"):
+                if result and result.get("success"):
                     success_count += 1
                 print(f"處理訂單 {order_record['id']}: {'成功' if result['success'] else result['reason']}")
             except Exception as e:
