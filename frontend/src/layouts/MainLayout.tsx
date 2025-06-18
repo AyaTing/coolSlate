@@ -32,7 +32,7 @@ const MainLayout = () => {
           </Link>
           {
             <nav className="hidden md:flex items-center space-x-5 lg:space-x-7 text-m font-medium">
-              <Link
+              {/* <Link
                 to="/"
                 className="p-1.5 text-[var(--color-text-primary)] hover:bg-[var(--color-brand-secondary)] transition-colors"
                 activeProps={{
@@ -40,7 +40,7 @@ const MainLayout = () => {
                 }}
               >
                 選購空調試算
-              </Link>
+              </Link> */}
               <Link
                 preload="render"
                 to="/service"
@@ -86,15 +86,15 @@ const MainLayout = () => {
                 </button>
               )}
 
-              <Link
-                to="/"
+              {/* <Link
+                to="/contact"
                 className="p-1.5 text-[var(--color-text-primary)] hover:bg-[var(--color-brand-secondary)] transition-colors"
                 activeProps={{
                   className: "text-[var(--color-brand-primary)] font-semibold",
                 }}
               >
                 聯絡我們
-              </Link>
+              </Link> */}
               {isAuthenticated ? (
                 <button
                   onClick={handleLogout}
