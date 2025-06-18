@@ -1,7 +1,7 @@
 import resend
 import os
 from urllib.parse import quote
-from datetime import datetime, date, time
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()

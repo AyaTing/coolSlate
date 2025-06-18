@@ -1,20 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, UploadFile, File
-from utils.auth import require_admin, get_connection
+from utils.auth import require_admin
+from utils.dependencies import get_connection, get_http_client
 from services.admin_service import (
     get_all_orders_service,
     get_all_users_service,
     get_user_orders_service_by_admin,
     cancel_order,
     update_order_refund_status,
-    upload_completion_file, 
-    get_completion_file, 
-    update_order_completion_status
+    upload_completion_file,
+    get_completion_file,
+    update_order_completion_status,
 )
 from services.booking_service import get_order_detail_service
 from services.scheduling_service import process_immediate_scheduling
 from models.booking_model import OrderDetail
 import asyncpg
 from typing import Optional
+import httpx
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -83,14 +85,22 @@ async def schedule_order(
     order_id: int,
     current_user: dict = Depends(require_admin),
     db: asyncpg.Connection = Depends(get_connection),
+    http_client: httpx.AsyncClient = Depends(get_http_client),
 ):
     try:
         order = await get_order_detail_service(order_id, db)
         if order.service_type in ["INSTALLATION", "MAINTENANCE"]:
             result = await process_immediate_scheduling(order_id, db)
             return result
+        elif order.service_type == "REPAIR":
+            result = await process_repair_order(order_id, db, http_client)
+            if not result["success"]:
+                raise HTTPException(status_code=409, detail=f"排程失敗: {result['reason']}")
+            return result
         else:
-            pass  # 待維修排程邏輯完成
+            raise HTTPException(status_code=400, detail="未知的服務類型")
+    except HTTPException:
+        raise  
     except Exception as e:
         print(f"排程出現錯誤: {str(e)}")
         raise HTTPException(status_code=500, detail="排程出現錯誤")
@@ -127,14 +137,14 @@ async def cancel_order_by_admin(
     except Exception as e:
         print(f"取消訂單失敗: {e}")
         raise HTTPException(status_code=500, detail="取消訂單失敗")
-    
+
 
 @router.post("/order/{order_id}/completion")
 async def upload_order_completion(
     order_id: int,
     file: UploadFile = File(...),
     current_user: dict = Depends(require_admin),
-    db: asyncpg.Connection = Depends(get_connection)
+    db: asyncpg.Connection = Depends(get_connection),
 ):
     try:
         result = await upload_completion_file(order_id, file, db)
@@ -150,7 +160,7 @@ async def upload_order_completion(
 async def get_order_completion(
     order_id: int,
     current_user: dict = Depends(require_admin),
-    db: asyncpg.Connection = Depends(get_connection)
+    db: asyncpg.Connection = Depends(get_connection),
 ):
     try:
         result = await get_completion_file(order_id, db)

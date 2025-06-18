@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from db.database import close_pool, create_pool
 from fastapi.middleware.cors import CORSMiddleware
 from routers import calendar_router, booking_router, payment_router, auth_router, admin_router
-from services.cleanup_service import cleanup_loop
+from services.background_service import cleanup_loop, repair_scheduling_loop
 import asyncio
 import httpx
 
@@ -14,12 +14,14 @@ async def lifespan(app: FastAPI):
         app.state.db_pool = await create_pool()
         app.state.http_client = httpx.AsyncClient(timeout=10.0)
         app.state.cleanup = asyncio.create_task(cleanup_loop(app.state.db_pool))
+        app.state.repair_scheduler = asyncio.create_task(repair_scheduling_loop(app.state.db_pool, app.state.http_client))
         yield
     except Exception as e:
         print(f"服務啟動失敗：{e}")
         app.state.db_pool = None
         app.state.http_client = None
         app.state.cleanup = None
+        app.state.repair_scheduler = None
     finally:
         if app.state.db_pool:
             await close_pool(app.state.db_pool)
@@ -29,14 +31,15 @@ async def lifespan(app: FastAPI):
             app.state.http_client = None
         if app.state.cleanup and not app.state.cleanup.done():
             app.state.cleanup.cancel()
-        try:
-            await app.state.cleanup
-        except asyncio.CancelledError:
-            print("清理服務已成功停止")
-        except Exception as e:
-            print(f"停止清理服務時發生錯誤: {e}")
+        if app.state.repair_scheduler and not app.state.repair_scheduler.done():
+            app.state.repair_scheduler.cancel()
+        tasks = []
+        tasks.append(app.state.cleanup)
+        tasks.append(app.state.repair_scheduler)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         app.state.cleanup = None
-
+        app.state.repair_scheduler = None
 
 app = FastAPI(lifespan=lifespan)
 

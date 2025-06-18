@@ -196,6 +196,7 @@ async def cancel_order(order_id: int, db):
                 FROM orders o 
                 JOIN service_types st ON o.service_type_id = st.id 
                 WHERE o.id = $1
+                FOR UPDATE
             """
             order = await db.fetchrow(select_query, order_id)
             if not order:

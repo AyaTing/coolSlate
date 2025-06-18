@@ -13,6 +13,7 @@ class OrderStatus(str, Enum):
     CANCELLED = "cancelled"
     PRECANCEL = "precancel" 
     PENDING_RESCHEDULE = "pending_reschedule"
+    SCHEDULING_FAILED = "scheduling_failed"
 
 
 class EquipmentItem(BaseModel):
@@ -75,3 +76,4 @@ class OrderDetail(BaseModel):
     booking_slots: List[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime
+    scheduling_feedback: Optional[str]
