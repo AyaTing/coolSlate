@@ -62,10 +62,19 @@ const MOCK_PRODUCTS = [
   },
 ];
 
+const determineRegion = (address: string): string => {
+  const keywords = ["台北", "新北"];
+  if (keywords.some((keyword) => address.includes(keyword))) {
+    return "雙北";
+  }
+  return "其他地區";
+};
+
 const calculatePrice = (
   serviceType: string,
   unitCount: number,
-  equipmentItems: EquipmentItem[] = []
+  equipmentItems: EquipmentItem[] = [],
+  locationAddress: string
 ): number => {
   switch (serviceType) {
     case "新機安裝":
@@ -74,9 +83,10 @@ const calculatePrice = (
         0
       );
     case "冷氣保養":
-      return 2000 + Math.max(0, unitCount - 1) * 1000; // 基本2000，每增加一台+1000
+      return 2000 + Math.max(0, unitCount - 1) * 1000;
     case "冷氣維修":
-      return 1000; // 固定價格（實際會根據地區調整，這裡簡化）
+      const region = determineRegion(locationAddress);
+      return region === "雙北" ? 500 : 1000;
     default:
       return 0;
   }
@@ -184,7 +194,8 @@ const BookingForm = ({
   const totalAmount = calculatePrice(
     serviceType,
     formData.unit_count,
-    serviceType === "新機安裝" ? cart : []
+    serviceType === "新機安裝" ? cart : [],
+    formData.location_address
   );
 
   const updateBasicInfo = (
@@ -195,6 +206,8 @@ const BookingForm = ({
       ...prev,
       [field]: value,
     }));
+    if (field === "location_address" && serviceType === "冷氣維修") {
+    }
   };
 
   const updateContactInfo = (
