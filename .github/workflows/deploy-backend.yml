@@ -1,0 +1,114 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/backend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 登入 GitHub Container Registry
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # 停止並移除現有容器
+            docker stop coolslate-backend 2>/dev/null || true
+            docker rm coolslate-backend 2>/dev/null || true
+
+            # 拉取最新映像檔
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            # 啟動新容器（讀取 .env 檔案）
+            docker run -d \
+              --name coolslate-backend \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              -v /home/${{ secrets.EC2_USER }}/app/.env:/app/.env:ro \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            # 清理舊映像檔
+            docker image prune -f
+
+            # 等待服務啟動
+            sleep 15
+
+            # 檢查容器狀態
+            if docker ps | grep -q coolslate-backend; then
+              echo "✅ 容器啟動成功"
+            else
+              echo "❌ 容器啟動失敗"
+              docker logs coolslate-backend
+              exit 1
+            fi
+
+      - name: 🏥 Health check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 等待應用程式完全啟動
+            for i in {1..30}; do
+              if curl -f http://localhost:8000/status >/dev/null 2>&1; then
+                echo "✅ 服務狀態檢查通過"
+                # 顯示詳細狀態
+                curl -s http://localhost:8000/status | jq '.' || curl -s http://localhost:8000/status
+                exit 0
+              fi
+              echo "等待應用程式啟動... ($i/30)"
+              sleep 2
+            done
+            echo "❌ 服務狀態檢查失敗"
+            echo "最近的容器日誌："
+            docker logs coolslate-backend --tail 50
+            exit 1
