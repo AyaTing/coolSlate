@@ -1,5 +1,5 @@
-const API_BASE_URL = "https://cool-slate.ayating.lol/api";
-// const API_BASE_URL = "http://0.0.0.0:8000/api";
+// const API_BASE_URL = "https://cool-slate.ayating.lol/api";
+const API_BASE_URL = "https://coolslate.ayating.lol/api";
 
 export interface OrderDetail {
   order_id: number;

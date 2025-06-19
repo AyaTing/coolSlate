@@ -10,8 +10,8 @@ export const queryClient = new QueryClient({
   },
 });
 
-const API_BASE_URL = "https://cool-slate.ayating.lol/api";
-// const API_BASE_URL = "http://0.0.0.0:8000/api";
+// const API_BASE_URL = "https://cool-slate.ayating.lol/api";
+const API_BASE_URL = "https://coolslate.ayating.lol/api";
 
 // 服務類型對照表：前端中文 -> 後端英文
 const SERVICE_TYPE_MAP = {

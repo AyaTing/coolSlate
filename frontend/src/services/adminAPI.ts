@@ -1,6 +1,7 @@
 import { type OrderDetail } from "../services/orderAPI";
 import { type User } from "../services/authAPI";
-const API_BASE_URL = "https://cool-slate.ayating.lol/api";
+// const API_BASE_URL = "https://cool-slate.ayating.lol/api";
+const API_BASE_URL = "https://coolslate.ayating.lol/api";
 
 interface AdminOrdersResponse {
   orders: OrderDetail[];
