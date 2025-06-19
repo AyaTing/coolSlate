@@ -11,6 +11,10 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/backend
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -83,14 +87,14 @@ jobs:
 
             # 檢查容器狀態
             if docker ps | grep -q coolslate-backend; then
-              echo "✅ 容器啟動成功"
+              echo "容器啟動成功"
             else
-              echo "❌ 容器啟動失敗"
+              echo "容器啟動失敗"
               docker logs coolslate-backend
               exit 1
             fi
 
-      - name: 🏥 Health check
+      - name: Health check
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -100,7 +104,7 @@ jobs:
             # 等待應用程式完全啟動
             for i in {1..30}; do
               if curl -f http://localhost:8000/status >/dev/null 2>&1; then
-                echo "✅ 服務狀態檢查通過"
+                echo "服務狀態檢查通過"
                 # 顯示詳細狀態
                 curl -s http://localhost:8000/status | jq '.' || curl -s http://localhost:8000/status
                 exit 0
@@ -108,7 +112,7 @@ jobs:
               echo "等待應用程式啟動... ($i/30)"
               sleep 2
             done
-            echo "❌ 服務狀態檢查失敗"
+            echo "服務狀態檢查失敗"
             echo "最近的容器日誌："
             docker logs coolslate-backend --tail 50
             exit 1

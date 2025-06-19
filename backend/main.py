@@ -66,7 +66,7 @@ app.include_router(admin_router.router)
 
 @app.get("/status")
 async def check_status():
-    if not app.state.db_pool or not app.state.http_client or not app.state.cleanup:
+    if not app.state.db_pool or not app.state.http_client or not app.state.cleanup or not app.state.repair_scheduler:
         raise HTTPException(status_code=500, detail="後端服務無法使用")
     return {"status": "success", "message": "後端服務正常運行"}
 
