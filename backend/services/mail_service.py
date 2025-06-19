@@ -175,6 +175,7 @@ def send_cancellation_confirmation_email(order_data: dict):
         service_type = service_type_map.get(
             order_data["service_type"], order_data["service_type"]
         )
+        preferred_time = order_data["preferred_time"].strftime("%H:%M")
         html_content = f"""
         <div
   style="
@@ -184,6 +185,7 @@ def send_cancellation_confirmation_email(order_data: dict):
     padding: 20px;
   "
 >
+<div style="display: flex; flex-direction: column">
   <div style="background: #6c757d; padding: 30px; border-radius: 0 0 8px 8px">
     <div style="width: 60%; margin: 0 auto; background: #fff">
       <img
@@ -232,7 +234,7 @@ def send_cancellation_confirmation_email(order_data: dict):
       <p><strong>服務地址：</strong>{order_data["location_address"]}</p>
       <p><strong>服務金額：</strong>NT$ {order_data["total_amount"]}</p>
       <p><strong>服務日期：</strong>{order_data["preferred_date"]}</p>
-      <p><strong>服務時間：</strong>{order_data["preferred_time"]}</p>
+      <p><strong>服務時間：</strong>{preferred_time}</p>
     </div>
     <div
       style="
@@ -276,6 +278,7 @@ def send_cancellation_confirmation_email(order_data: dict):
       </p>
     </div>
   </div>
+    </div>
 </div>
     """
         params = {
@@ -286,10 +289,10 @@ def send_cancellation_confirmation_email(order_data: dict):
         }
         result = resend.Emails.send(params)
         if result and "id" in result:
-          print(
+            print(
                 f"排程成功郵件已發送給 {order_data["user_email"]}, 郵件ID: {result["id"]}"
             )
-          return {"success": True, "email_id": result["id"]}
+            return {"success": True, "email_id": result["id"]}
         else:
             print(f"訂單 {order_data["order_id"]}郵件發送失敗")
             return {"success": False, "error": "無效的回應格式"}

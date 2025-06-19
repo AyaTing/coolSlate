@@ -193,7 +193,7 @@ const ServicePage = () => {
                     setIsBookingFormOpen(false);
                   }}
                   disabled={isLoading}
-                  className={`px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 ${
+                  className={`px-4 md:px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 ${
                     selectedService === serviceName
                       ? "bg-[var(--color-brand-primary)] text-[var(--color-text-secondary)] shadow-lg"
                       : "bg-[var(--color-bg-card)] text-[var(--color-text-primary)] hover:bg-[var(--color-brand-primary-light)] hover:shadow-md"

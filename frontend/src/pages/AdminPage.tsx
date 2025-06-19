@@ -607,7 +607,7 @@ const AdminPage = () => {
             {orderDetail.status === "completed" && (
               <button
                 onClick={() => handleViewCompletion(orderDetail.order_id)}
-                className="px-4 py-2 bg-blue-500 text-[var(--color-text-secondary)] rounded"
+                className="px-4 py-2 bg-[var(--color-brand-primary)] text-[var(--color-text-secondary)] rounded"
               >
                 查看報告
               </button>
@@ -878,10 +878,10 @@ const AdminPage = () => {
                       <p className="font-medium">
                         NT$ {order.total_amount?.toLocaleString()}
                       </p>
-                      <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                      <span className="text-[10px] md:text-xs bg-gray-100 px-2 py-1 rounded">
                         {toFrontendOrderStatus(order.status)}
                       </span>
-                      <span className="text-xs bg-blue-100 px-2 py-1 rounded ml-1">
+                      <span className="text-[10px] md:text-xs bg-blue-100 px-2 py-1 rounded ml-1">
                         {toFrontendPaymentStatus(order.payment_status)}
                       </span>
                     </div>
@@ -913,7 +913,7 @@ const AdminPage = () => {
                   onClick={() => {
                     setSelectedOption(option);
                   }}
-                  className={`px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 ${
+                  className={`px-4 md:px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 ${
                     selectedOption === option
                       ? "bg-[var(--color-brand-primary)] text-[var(--color-text-secondary)] shadow-lg"
                       : "bg-[var(--color-bg-card)] text-[var(--color-text-primary)] hover:bg-[var(--color-brand-primary-light)] hover:shadow-md"

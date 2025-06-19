@@ -12,8 +12,9 @@ const MainLayout = () => {
   const handleLogout = () => {
     logoutMutation.mutate();
   };
-
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const isAdmin = user?.role === "admin";
+  const closeMobileMenu = () => setShowMobileMenu(false);
 
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-bg-main)] text-[var(--color-text-primary)]">
@@ -117,6 +118,7 @@ const MainLayout = () => {
             <div className="md:hidden">
               <button
                 type="button"
+                onClick={() => setShowMobileMenu(true)}
                 className="p-2 rounded-md text-[var(--color-text-primary)] hover:text-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--color-brand-secondary)]"
                 aria-label="開啟主選單"
               >
@@ -131,7 +133,7 @@ const MainLayout = () => {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                    d="M12 4.5v15m7.5-7.5h-15"
                   />
                 </svg>
               </button>
@@ -139,6 +141,125 @@ const MainLayout = () => {
           }
         </div>
       </header>
+      {showMobileMenu && (
+        <div className="fixed inset-0 bg-[var(--color-text-primary)]/10 flex items-center justify-center z-50">
+          <div className="bg-[var(--color-bg-card-secondary)] p-6 rounded-lg max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+                選單
+              </h2>
+              <button
+                onClick={closeMobileMenu}
+                className="p-1 rounded-md text-[var(--color-text-primary)] hover:text-[var(--color-text-tertiary)]"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="w-6 h-6"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <nav className="flex flex-col space-y-4">
+              <Link
+                preload="render"
+                to="/"
+                onClick={closeMobileMenu}
+                className="w-full p-3 text-center text-[var(--color-text-primary)] hover:bg-[var(--color-brand-secondary)] transition-colors rounded-md"
+                activeProps={{
+                  className:
+                    "text-[var(--color-brand-primary)] font-semibold bg-[var(--color-brand-secondary)]",
+                }}
+              >
+                首頁
+              </Link>
+              <Link
+                preload="render"
+                to="/service"
+                onClick={closeMobileMenu}
+                className="w-full p-3 text-center text-[var(--color-text-primary)] hover:bg-[var(--color-brand-secondary)] transition-colors rounded-md"
+                activeProps={{
+                  className:
+                    "text-[var(--color-brand-primary)] font-semibold bg-[var(--color-brand-secondary)]",
+                }}
+              >
+                服務預約
+              </Link>
+
+              {isAuthenticated ? (
+                <>
+                  {isAdmin && (
+                    <Link
+                      to="/admin"
+                      onClick={closeMobileMenu}
+                      className="w-full p-3 text-center text-[var(--color-text-primary)] hover:bg-[var(--color-brand-secondary)] transition-colors rounded-md"
+                      activeProps={{
+                        className:
+                          "text-[var(--color-brand-primary)] font-semibold bg-[var(--color-brand-secondary)]",
+                      }}
+                    >
+                      管理後台
+                    </Link>
+                  )}
+
+                  <Link
+                    to="/profile"
+                    onClick={closeMobileMenu}
+                    className="w-full p-3 text-center text-[var(--color-text-primary)] hover:bg-[var(--color-brand-secondary)] transition-colors rounded-md"
+                    activeProps={{
+                      className:
+                        "text-[var(--color-brand-primary)] font-semibold bg-[var(--color-brand-secondary)]",
+                    }}
+                  >
+                    會員中心
+                  </Link>
+
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      closeMobileMenu();
+                    }}
+                    className="w-full bg-[var(--color-brand-primary)] hover:scale-105 text-[var(--color-text-secondary)] py-3 px-5 rounded-md transition-colors font-semibold"
+                  >
+                    登出
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowLoginModal(true);
+                      closeMobileMenu();
+                    }}
+                    className="w-full p-3 text-center text-[var(--color-text-primary)] hover:bg-[var(--color-brand-secondary)] transition-colors rounded-md"
+                  >
+                    會員中心
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowLoginModal(true);
+                      closeMobileMenu();
+                    }}
+                    className="w-full bg-[var(--color-brand-primary)] hover:scale-105 text-[var(--color-text-secondary)] py-3 px-5 rounded-md transition-colors font-semibold"
+                  >
+                    登入 / 註冊
+                  </button>
+                </>
+              )}
+            </nav>
+          </div>
+        </div>
+      )}
       <main className="flex-grow w-full">
         <Outlet />
       </main>

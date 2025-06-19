@@ -146,7 +146,7 @@ const Calendar = ({
         {emptyDays.map((_, index) => (
           <div
             key={`empty-${index}`}
-            className="h-20 border-r border-b border-gray-100"
+            className="h-15 md:h-20 border-r border-b border-gray-100"
           />
         ))}
 
@@ -167,7 +167,7 @@ const Calendar = ({
           return (
             <div
               key={day.date}
-              className={`h-20 border-r border-b border-gray-100 p-2 cursor-pointer transition-colors relative ${
+              className={`h-15 md:h-20 border-r border-b border-gray-100 p-2 cursor-pointer transition-colors relative ${
                 isBookable
                   ? "hover:bg-blue-50 hover:border-blue-200"
                   : "bg-gray-50"
@@ -186,7 +186,7 @@ const Calendar = ({
                 {isBookable && (
                   <div className="flex-1 flex flex-col justify-center items-center">
                     <div className="w-2 h-2 bg-green-500 rounded-full mb-1"></div>
-                    <div className="text-xs text-green-600 text-center">
+                    <div className="hidden md:block text-xs text-green-600 text-center ">
                       {hasSlots
                         ? `${day.available_slots.length}時段`
                         : "可預約"}

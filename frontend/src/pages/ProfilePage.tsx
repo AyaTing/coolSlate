@@ -278,9 +278,9 @@ const ProfilePage = () => {
           orders?.filter((o) => o.status === "scheduled").length || 0;
         return (
           <div className="grid lg:grid-cols-2 gap-8">
-            <div className="space-y-4 p-10 rounded-lg shadow-md bg-gradient-to-br from-[var(--color-brand-primary-light)]/10  via-[var(--color-bg-card-tertiary)] to-[var(--color-bg-card-tertiary)]  hover:shadow-lg transition-shadow border border-gray-200/50 hover:border-[var(--color-brand-primary)]/50  text-[var(--color-text-primary)]">
+            <div className="space-y-4 p-4 md:p-10 rounded-lg shadow-md bg-gradient-to-br from-[var(--color-brand-primary-light)]/10  via-[var(--color-bg-card-tertiary)] to-[var(--color-bg-card-tertiary)]  hover:shadow-lg transition-shadow border border-gray-200/50 hover:border-[var(--color-brand-primary)]/50  text-[var(--color-text-primary)]">
               <h2 className="text-xl font-semibold">會員資訊</h2>
-              <div className="space-y-2">
+              <div className="text-lg space-y-2">
                 <p>
                   <strong>姓名：</strong>
                   {user?.name}
@@ -300,7 +300,7 @@ const ProfilePage = () => {
               <div className="grid grid-cols-2 gap-4 ">
                 <div className="bg-[var(--color-bg-card-secondary)] hover:bg-[var(--color-bg-card-tertiary)] p-4 rounded-lg text-center space-y-4">
                   <p className="text-2xl font-bold ">{scheduledOrders}</p>
-                  <p className="text-sm ">已排程，等待施作</p>
+                  <p className="text-sm ">已排程</p>
                 </div>
                 <div className="bg-[var(--color-bg-card-secondary)] hover:bg-[var(--color-bg-card-tertiary)] p-4 rounded-lg text-center space-y-4">
                   <p className="text-2xl font-bold ">{unpaidOrders}</p>
@@ -370,10 +370,10 @@ const ProfilePage = () => {
                       <p className="font-medium">
                         NT$ {order.total_amount?.toLocaleString()}
                       </p>
-                      <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                      <span className="text-[10px] md:text-xs bg-gray-100 px-2 py-1 rounded">
                         {toFrontendOrderStatus(order.status)}
                       </span>
-                      <span className="text-xs bg-blue-100 px-2 py-1 rounded ml-1">
+                      <span className="text-[10px] md:text-xs bg-blue-100 px-2 py-1 rounded ml-1">
                         {toFrontendPaymentStatus(order.payment_status)}
                       </span>
                     </div>
@@ -405,7 +405,7 @@ const ProfilePage = () => {
                   onClick={() => {
                     setSelectedOption(option);
                   }}
-                  className={`px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 ${
+                  className={`px-4 md:px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 ${
                     selectedOption === option
                       ? "bg-[var(--color-brand-primary)] text-[var(--color-text-secondary)] shadow-lg"
                       : "bg-[var(--color-bg-card)] text-[var(--color-text-primary)] hover:bg-[var(--color-brand-primary-light)] hover:shadow-md"

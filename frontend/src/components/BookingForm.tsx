@@ -465,8 +465,8 @@ const BookingForm = ({
                   key={product.model}
                   className="border border-gray-200 rounded-lg p-4"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="text-4xl">{product.image}</div>
+                  <div className="flex items-start gap-2 md:gap-4">
+                    <div className="text-lg md:text-4xl">{product.image}</div>
                     <div className="flex-1">
                       <h5 className="font-medium text-gray-900">
                         {product.name}
@@ -509,7 +509,7 @@ const BookingForm = ({
                   {cart.map((item) => (
                     <div
                       key={item.model}
-                      className="flex items-center justify-between bg-gray-50 p-3 rounded-lg"
+                      className="flex-col space-y-1 md:flex-row flex items-center justify-between bg-gray-50 p-3 rounded-lg"
                     >
                       <div>
                         <p className="font-medium">{item.name}</p>
@@ -627,7 +627,7 @@ const BookingForm = ({
             type="submit"
             className="flex-1 px-4 py-2 bg-[var(--color-brand-primary)] text-[var(--color-text-secondary)] rounded-lg hover:opacity-90 transition-colors"
           >
-            確認預約 - NT$ {totalAmount.toLocaleString()}
+            確認預約
           </button>
         </div>
       </form>
