@@ -60,8 +60,11 @@ jobs:
           docker stop coolslate-backend 2>/dev/null || true
           docker rm coolslate-backend 2>/dev/null || true
 
+          IMAGE_NAME_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" | tr '[:upper:]' '[:lower:]')
+          echo "使用映像檔: $IMAGE_NAME_LOWER"
+
           # 拉取最新映像檔
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker pull "$IMAGE_NAME_LOWER"
 
           # 啟動新容器
           docker run -d \
