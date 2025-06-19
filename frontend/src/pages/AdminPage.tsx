@@ -201,6 +201,15 @@ const AdminPage = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (selectedOption !== "訂單總表") {
+      setOrderStatus("");
+      setPaymentStatus("");
+      setServiceType("");
+      setOrdersPage(1);
+    }
+  }, [selectedOption]);
+
+  useEffect(() => {
     if (selectedOption === "訂單總表") {
       setOrdersPage(1);
     }
@@ -495,11 +504,12 @@ const AdminPage = () => {
             ? "❄️ 新機安裝"
             : order.service_type === "MAINTENANCE"
             ? "🧼 冷氣保養"
-            : "⚙️ 冷氣維修"}{" "}
+            : "⚙️ 冷氣維修"}
+          {""}
           <span className="ml-1 font-bold text-red-500 opacity-70">
             {bookingDate < today ? "已過期" : ""}
           </span>
-          <span className="ml-1 font-bold text-red-500 opacity-70">
+          <span className="font-bold text-red-500 opacity-70">
             {order.status === "scheduling_failed" ? "排程失敗" : ""}
           </span>
         </p>
