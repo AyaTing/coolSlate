@@ -154,7 +154,7 @@ async def get_user_orders_service_by_admin(user_id: int, db):
 async def update_order_refund_status(order_id: int, refund_user: str, db):
     try:
         async with db.transaction():
-            select_query = "SELECT id, order_number, status, payment_status, notes FROM orders WHERE id = $1"
+            select_query = "SELECT id, order_number, status, payment_status, notes FROM orders WHERE id = $1 FOR UPDATE"
             order = await db.fetchrow(
                 select_query,
                 order_id,
@@ -326,11 +326,11 @@ async def cleanup_all_order_locks(order_id: int, db):
 async def upload_completion_file(order_id: int, file: UploadFile, db):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="只允許上傳 PDF 檔案")
-    if file.size > 10 * 1024 * 1024:
+    if not file.size or file.size > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="檔案大小不能超過 10MB")
     try:
         async with db.transaction():
-            select_query = "SELECT id, order_number, status FROM orders WHERE id = $1"
+            select_query = "SELECT id, order_number, status FROM orders WHERE id = $1 FOR UPDATE"
             order = await db.fetchrow(select_query, order_id)
             if not order:
                 raise HTTPException(status_code=404, detail="訂單不存在")
@@ -383,7 +383,7 @@ async def upload_completion_file(order_id: int, file: UploadFile, db):
 async def update_order_completion_status(order_id: int, db):
     try:
         async with db.transaction():
-            select_query = "SELECT id, order_number, status FROM orders WHERE id = $1"
+            select_query = "SELECT id, order_number, status FROM orders WHERE id = $1 FOR UPDATE"
             order = await db.fetchrow(select_query, order_id)
             if not order:
                 raise HTTPException(status_code=404, detail="訂單不存在")

@@ -133,7 +133,7 @@ async def handle_webhook(payload: bytes, sig_header: str, db):
             order_id = int(session["metadata"]["order_id"])
             try:
                 async with db.transaction():
-                    select_query = "SELECT o.*, st.name as service_type, st.required_workers, st.base_duration_hours, st.additional_duration_hours, u.email as user_email FROM orders o    JOIN service_types st ON o.service_type_id = st.id JOIN users u ON o.user_id = u.id WHERE o.id = $1"
+                    select_query = "SELECT o.*, st.name as service_type, st.required_workers, st.base_duration_hours, st.additional_duration_hours, u.email as user_email FROM orders o    JOIN service_types st ON o.service_type_id = st.id JOIN users u ON o.user_id = u.id WHERE o.id = $1 FOR UPDATE"
                     order_info = await db.fetchrow(select_query, order_id)
                     if not order_info:
                         print(f"訂單 {order_id} 不存在")
