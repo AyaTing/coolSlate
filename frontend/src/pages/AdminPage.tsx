@@ -500,7 +500,7 @@ const AdminPage = () => {
             {bookingDate < today ? "已過期" : ""}
           </span>
           <span className="ml-1 font-bold text-red-500 opacity-70">
-            {orderDetail?.status === "scheduling_failed" ? "排程失敗" : ""}
+            {order.status === "scheduling_failed" ? "排程失敗" : ""}
           </span>
         </p>
 
@@ -816,6 +816,7 @@ const AdminPage = () => {
                 <option value="">所有狀態</option>
                 <option value="pending_schedule">待排程</option>
                 <option value="scheduled">已排程</option>
+                <option value="scheduling_failed">排程失敗</option>
                 <option value="completed">已完成</option>
                 <option value="cancelled">已取消</option>
                 <option value="precancel">取消申請中</option>
