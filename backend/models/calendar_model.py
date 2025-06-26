@@ -4,9 +4,10 @@ from datetime import date, time
 from models.service_model import ServiceType
 
 
-class SlotDetail(BaseModel): 
+class SlotDetail(BaseModel):
     time: time
     available_workers: int
+
 
 class CalendarDay(BaseModel):
     date: date
@@ -14,12 +15,14 @@ class CalendarDay(BaseModel):
     is_available_for_booking: bool
     is_weekend: bool = False
 
+
 class CalendarResponse(BaseModel):
     service_type: ServiceType
     days: List[CalendarDay]
     booking_range: Dict[str, date]
     current_month: int
     current_year: int
+
 
 class SlotResponse(BaseModel):
     available: bool

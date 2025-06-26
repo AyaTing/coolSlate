@@ -9,6 +9,7 @@ import boto3
 from botocore.exceptions import ClientError
 import uuid
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 
@@ -84,8 +85,6 @@ async def get_all_orders_service(
             order_dict["order_id"] = order_dict["id"]
             order_dict["booking_slots"] = [dict(slot) for slot in slots]
             if order_dict["equipment_details"]:
-                import json
-
                 order_dict["equipment_details"] = json.loads(
                     order_dict["equipment_details"]
                 )
@@ -217,7 +216,7 @@ async def cancel_order(order_id: int, db):
             ):
                 update_query = "UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1"
                 await db.execute(update_query, order_id)
-                result =  {
+                result = {
                     "success": True,
                     "message": f"訂單 {order['order_number']} 已成功取消",
                     "cleaned_locks": 0,
@@ -242,17 +241,21 @@ async def cancel_order(order_id: int, db):
                 select_query = "SELECT preferred_date, preferred_time FROM booking_slots WHERE order_id = $1 ORDER BY is_selected DESC, is_primary DESC, preferred_date, preferred_time LIMIT 1"
                 booking_slot = await db.fetchrow(select_query, order_id)
                 if user:
-                    order_data  = {
-                    "order_id": order_id,
-                    "order_number": order["order_number"],
-                    "service_type": order["service_type"],
-                    "location_address": order["location_address"],
-                    "total_amount": order["total_amount"],
-                    "preferred_date": booking_slot["preferred_date"] if booking_slot else None,
-                    "preferred_time": booking_slot["preferred_time"] if booking_slot else None,
-                    "user_email": user["email"],
-                    "user_name": user["name"]
-                }
+                    order_data = {
+                        "order_id": order_id,
+                        "order_number": order["order_number"],
+                        "service_type": order["service_type"],
+                        "location_address": order["location_address"],
+                        "total_amount": order["total_amount"],
+                        "preferred_date": (
+                            booking_slot["preferred_date"] if booking_slot else None
+                        ),
+                        "preferred_time": (
+                            booking_slot["preferred_time"] if booking_slot else None
+                        ),
+                        "user_email": user["email"],
+                        "user_name": user["name"],
+                    }
                 mail_result = send_cancellation_confirmation_email(order_data)
                 email_sent = mail_result.get("success", False)
             except Exception as email_error:
@@ -264,7 +267,7 @@ async def cancel_order(order_id: int, db):
     except Exception as e:
         print(f"取消訂單失敗：{e}")
         raise HTTPException(status_code=500, detail="取消訂單失敗")
-    
+
 
 async def cleanup_all_order_locks(order_id: int, db):
     try:
@@ -330,7 +333,9 @@ async def upload_completion_file(order_id: int, file: UploadFile, db):
         raise HTTPException(status_code=400, detail="檔案大小不能超過 10MB")
     try:
         async with db.transaction():
-            select_query = "SELECT id, order_number, status FROM orders WHERE id = $1 FOR UPDATE"
+            select_query = (
+                "SELECT id, order_number, status FROM orders WHERE id = $1 FOR UPDATE"
+            )
             order = await db.fetchrow(select_query, order_id)
             if not order:
                 raise HTTPException(status_code=404, detail="訂單不存在")
@@ -383,7 +388,9 @@ async def upload_completion_file(order_id: int, file: UploadFile, db):
 async def update_order_completion_status(order_id: int, db):
     try:
         async with db.transaction():
-            select_query = "SELECT id, order_number, status FROM orders WHERE id = $1 FOR UPDATE"
+            select_query = (
+                "SELECT id, order_number, status FROM orders WHERE id = $1 FOR UPDATE"
+            )
             order = await db.fetchrow(select_query, order_id)
             if not order:
                 raise HTTPException(status_code=404, detail="訂單不存在")

@@ -44,7 +44,7 @@ async def create_user(email: EmailStr, google_id: str, name: str, db):
         raise HTTPException(status_code=500, detail="使用者資料創建失敗")
 
 
-async def update_user_google_info(user_id: str, name: str = None, db = None):
+async def update_user_google_info(user_id: str, name: str = None, db=None):
     try:
         update_query = "UPDATE users SET name = COALESCE($1, name), updated_at = NOW() WHERE id = $2 RETURNING *"
         user_data = await db.fetchrow(update_query, name, user_id)
@@ -52,4 +52,3 @@ async def update_user_google_info(user_id: str, name: str = None, db = None):
     except Exception as e:
         print(f"使用者資料更新失敗: {e}")
         raise HTTPException(status_code=500, detail="使用者資料更新失敗")
-

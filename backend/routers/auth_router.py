@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Body 
+from fastapi import APIRouter, HTTPException, Depends, Body
 from utils.dependencies import get_connection
 from utils.auth import require_auth, require_admin
 from services.auth_service import google_login_service
@@ -8,8 +8,11 @@ import asyncpg
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
+
 @router.post("/login", response_model=LoginResponse)
-async def login(id_token: str = Body(...), db: asyncpg.Connection = Depends(get_connection)):
+async def login(
+    id_token: str = Body(...), db: asyncpg.Connection = Depends(get_connection)
+):
     try:
         return await google_login_service(id_token, db)
     except HTTPException as http_exc:
@@ -20,13 +23,15 @@ async def login(id_token: str = Body(...), db: asyncpg.Connection = Depends(get_
 
 
 @router.get("/user", response_model=User)
-async def get_user(current_user = Depends(require_auth)):
+async def get_user(current_user=Depends(require_auth)):
     return User(**current_user)
 
+
 @router.get("/admin", response_model=User)
-async def check_admin(admin_user = Depends(require_admin)):
+async def check_admin(admin_user=Depends(require_admin)):
     return User(**admin_user)
 
+
 @router.post("/logout")
-async def logout(current_user = Depends(require_auth)):
+async def logout(current_user=Depends(require_auth)):
     return {"message": "登出成功"}

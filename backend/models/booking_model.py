@@ -5,13 +5,14 @@ from models.service_model import ServiceType
 from enum import Enum
 from models.payment_model import PaymentStatus
 
+
 class OrderStatus(str, Enum):
     PENDING = "pending"
     PENDING_SCHEDULE = "pending_schedule"
     SCHEDULED = "scheduled"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
-    PRECANCEL = "precancel" 
+    PRECANCEL = "precancel"
     PENDING_RESCHEDULE = "pending_reschedule"
     SCHEDULING_FAILED = "scheduling_failed"
 
@@ -24,7 +25,7 @@ class EquipmentItem(BaseModel):
 
 
 class BookingSlotRequest(BaseModel):
-    preferred_date: date 
+    preferred_date: date
     preferred_time: time
     contact_name: str
     contact_phone: str
@@ -38,9 +39,9 @@ class OrderRequest(BaseModel):
     unit_count: int
     equipment_details: Optional[List[EquipmentItem]] = None
     notes: Optional[str] = None
-    booking_slots: List[BookingSlotRequest]= Field(..., min_items=1, max_items=2)
+    booking_slots: List[BookingSlotRequest] = Field(..., min_items=1, max_items=2)
     user_id: Optional[int] = None
-    
+
 
 class BookingSlotResponse(BaseModel):
     date: date
@@ -49,6 +50,7 @@ class BookingSlotResponse(BaseModel):
     contact_phone: str
     is_primary: bool
     is_available: bool
+
 
 class OrderResponse(BaseModel):
     order_id: int

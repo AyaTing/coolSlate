@@ -51,9 +51,7 @@ async def get_available_calendar(
                     if slot_data["services"]:
                         current_slot_time = slot_data["time"]
                         real_available_workers = await get_slot_available_workers(
-                            current_date,
-                            current_slot_time,
-                            db
+                            current_date, current_slot_time, db
                         )
                         available_slots.append(
                             SlotDetail(

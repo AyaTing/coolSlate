@@ -5,17 +5,23 @@ from utils.auth import require_auth, verify_order_ownership
 from models.payment_model import (
     PaymentStatusResponse,
     CheckoutSessionRequest,
-    CheckoutSessionResponse
+    CheckoutSessionResponse,
 )
 from services.payment_service import (
     create_checkout_session,
     get_payment_status,
     handle_webhook,
 )
+
 router = APIRouter(prefix="/api", tags=["payment"])
-    
+
+
 @router.post("/payment/create-checkout-session", response_model=CheckoutSessionResponse)
-async def create_checkout_session_endpoint(request: CheckoutSessionRequest,current_user: dict = Depends(require_auth), db: asyncpg.Connection = Depends(get_connection)):
+async def create_checkout_session_endpoint(
+    request: CheckoutSessionRequest,
+    current_user: dict = Depends(require_auth),
+    db: asyncpg.Connection = Depends(get_connection),
+):
     try:
         await verify_order_ownership(request.order_id, current_user["id"], db)
         return await create_checkout_session(request.order_id, db)
@@ -28,7 +34,11 @@ async def create_checkout_session_endpoint(request: CheckoutSessionRequest,curre
 
 
 @router.get("/payment/status/{order_id}", response_model=PaymentStatusResponse)
-async def get_payment_status_endpoint(order_id: int, current_user: dict = Depends(require_auth), db: asyncpg.Connection = Depends(get_connection)):
+async def get_payment_status_endpoint(
+    order_id: int,
+    current_user: dict = Depends(require_auth),
+    db: asyncpg.Connection = Depends(get_connection),
+):
     try:
         await verify_order_ownership(order_id, current_user["id"], db)
         return await get_payment_status(order_id, db)
@@ -39,8 +49,11 @@ async def get_payment_status_endpoint(order_id: int, current_user: dict = Depend
         print(f"查詢付款狀態失敗: {e}")
         raise HTTPException(status_code=500, detail="查詢付款狀態失敗")
 
+
 @router.post("/payment/webhook/stripe")
-async def stripe_webhook_endpoint(request: Request, db: asyncpg.Connection = Depends(get_connection)):
+async def stripe_webhook_endpoint(
+    request: Request, db: asyncpg.Connection = Depends(get_connection)
+):
     try:
         payload = await request.body()
         sig_header = request.headers.get("stripe-signature", "")
@@ -51,6 +64,3 @@ async def stripe_webhook_endpoint(request: Request, db: asyncpg.Connection = Dep
     except Exception as e:
         print(f"處理 Stripe webhook 失敗: {e}")
         raise HTTPException(status_code=500, detail="Webhook 處理失敗")
-    
-
-    

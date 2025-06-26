@@ -7,6 +7,7 @@ load_dotenv()
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 BASE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
+
 async def get_coordinates(address: str, client: httpx.AsyncClient):
     params = {"address": address, "key": GOOGLE_MAPS_API_KEY, "language": "zh-TW"}
     try:

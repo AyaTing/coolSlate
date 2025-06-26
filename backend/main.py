@@ -2,7 +2,13 @@ from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 from db.database import close_pool, create_pool
 from fastapi.middleware.cors import CORSMiddleware
-from routers import calendar_router, booking_router, payment_router, auth_router, admin_router
+from routers import (
+    calendar_router,
+    booking_router,
+    payment_router,
+    auth_router,
+    admin_router,
+)
 from services.background_service import cleanup_loop, repair_scheduling_loop
 import asyncio
 import httpx
@@ -14,7 +20,9 @@ async def lifespan(app: FastAPI):
         app.state.db_pool = await create_pool()
         app.state.http_client = httpx.AsyncClient(timeout=10.0)
         app.state.cleanup = asyncio.create_task(cleanup_loop(app.state.db_pool))
-        app.state.repair_scheduler = asyncio.create_task(repair_scheduling_loop(app.state.db_pool, app.state.http_client))
+        app.state.repair_scheduler = asyncio.create_task(
+            repair_scheduling_loop(app.state.db_pool, app.state.http_client)
+        )
         yield
     except Exception as e:
         print(f"服務啟動失敗：{e}")
@@ -41,6 +49,7 @@ async def lifespan(app: FastAPI):
         app.state.cleanup = None
         app.state.repair_scheduler = None
 
+
 app = FastAPI(lifespan=lifespan)
 
 origins = [
@@ -66,7 +75,12 @@ app.include_router(admin_router.router)
 
 @app.get("/status")
 async def check_status():
-    if not app.state.db_pool or not app.state.http_client or not app.state.cleanup or not app.state.repair_scheduler:
+    if (
+        not app.state.db_pool
+        or not app.state.http_client
+        or not app.state.cleanup
+        or not app.state.repair_scheduler
+    ):
         raise HTTPException(status_code=500, detail="後端服務無法使用")
     return {"status": "success", "message": "後端服務正常運行"}
 

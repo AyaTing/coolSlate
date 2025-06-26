@@ -91,7 +91,7 @@ async def process_immediate_scheduling(order_id: int, db):
             select_query = "SELECT u.email, u.name FROM users u JOIN orders o ON u.id = o.user_id WHERE o.id = $1"
             user = await db.fetchrow(select_query, order_id)
             if user:
-                order_data  = {
+                order_data = {
                     "order_id": order_id,
                     "order_number": order["order_number"],
                     "service_type": order["service_type"],
@@ -103,7 +103,7 @@ async def process_immediate_scheduling(order_id: int, db):
                     "contact_name": selected_slot.get("contact_name"),
                     "contact_phone": selected_slot.get("contact_phone"),
                     "user_email": user["email"],
-                    "user_name": user["name"]
+                    "user_name": user["name"],
                 }
                 result = send_scheduling_success_email(order_data)
                 email_sent = result.get("success", False)
@@ -199,21 +199,28 @@ async def process_repair_order(order_id: int, db, http_client):
                 lat, lng = order["location_lat"], order["location_lng"]
             company_info = await db.fetchrow("SELECT * FROM company_settings LIMIT 1")
             distance = await db.fetchval(
-            "SELECT calculate_distance($1, $2, $3, $4)",
-            lat, lng, company_info["company_lat"], company_info["company_lng"]
+                "SELECT calculate_distance($1, $2, $3, $4)",
+                lat,
+                lng,
+                company_info["company_lat"],
+                company_info["company_lng"],
             )
             if distance > company_info["max_service_distance_km"]:
                 feedback = f"超出服務範圍 ({distance:.1f}km > {company_info['max_service_distance_km']}km)"
                 update_query = "UPDATE orders SET status = 'scheduling_failed', scheduling_feedback = $1 WHERE id = $2"
-                await db.execute(update_query, feedback, order_id)          
+                await db.execute(update_query, feedback, order_id)
                 return {"success": False, "reason": "超出服務範圍"}
             select_query = "SELECT * FROM booking_slots WHERE order_id = $1 ORDER BY is_primary DESC"
             booking_slots = await db.fetch(select_query, order_id)
             selected_slot = None
             for slot in booking_slots:
                 can_book = await check_service_slot_bookable(
-                slot["preferred_date"], slot["preferred_time"], "REPAIR", order["unit_count"], db
-            )
+                    slot["preferred_date"],
+                    slot["preferred_time"],
+                    "REPAIR",
+                    order["unit_count"],
+                    db,
+                )
                 if can_book:
                     selected_slot = slot
                     break
@@ -222,18 +229,35 @@ async def process_repair_order(order_id: int, db, http_client):
                 await db.execute(update_query, order_id)
                 return {"success": False, "reason": "時段已滿"}
             required_hours = (
-            order["base_duration_hours"]+ (order["unit_count"] - 1) * order["additional_duration_hours"]
+                order["base_duration_hours"]
+                + (order["unit_count"] - 1) * order["additional_duration_hours"]
             )
             required_hours = min(required_hours, 8)
-            start_datetime = datetime.combine(selected_slot["preferred_date"], selected_slot["preferred_time"])
+            start_datetime = datetime.combine(
+                selected_slot["preferred_date"], selected_slot["preferred_time"]
+            )
             end_datetime = start_datetime + timedelta(hours=required_hours)
             insert_query = "INSERT INTO schedules (order_id, booking_slot_id, scheduled_date, scheduled_time, estimated_end_time, assigned_workers, status) VALUES ($1, $2, $3, $4, $5, $6, 'scheduled') RETURNING id"
-            schedule_id = await db.fetchval(insert_query,order_id, selected_slot["id"], selected_slot["preferred_date"], selected_slot["preferred_time"], end_datetime.time(), order["required_workers"])
+            schedule_id = await db.fetchval(
+                insert_query,
+                order_id,
+                selected_slot["id"],
+                selected_slot["preferred_date"],
+                selected_slot["preferred_time"],
+                end_datetime.time(),
+                order["required_workers"],
+            )
             for i in range(required_hours):
                 current_time = (start_datetime + timedelta(hours=i)).time()
                 if current_time < time(17, 0):
                     insert_query = "INSERT INTO daily_workforce_usage(date, time_slot, used_workers, schedule_id) VALUES ($1, $2, $3, $4)"
-                    await db.execute(insert_query, selected_slot["preferred_date"], current_time, order["required_workers"], schedule_id)
+                    await db.execute(
+                        insert_query,
+                        selected_slot["preferred_date"],
+                        current_time,
+                        order["required_workers"],
+                        schedule_id,
+                    )
             update_query = "UPDATE orders SET status = 'scheduled', scheduling_feedback = NULL WHERE id = $1"
             await db.execute(update_query, order_id)
             update_query = "UPDATE booking_slots SET is_selected = true WHERE id = $1"
@@ -244,18 +268,18 @@ async def process_repair_order(order_id: int, db, http_client):
             user = await db.fetchrow(select_query, order_id)
             if user:
                 order_data = {
-                "order_id": order_id,
-                "order_number": order["order_number"],
-                "service_type": "REPAIR",
-                "location_address": order["location_address"],
-                "total_amount": order["total_amount"],
-                "scheduled_date": selected_slot["preferred_date"],
-                "scheduled_time": selected_slot["preferred_time"],
-                "estimated_end_time": end_datetime.time(),
-                "contact_name": selected_slot.get("contact_name"),
-                "contact_phone": selected_slot.get("contact_phone"),
-                "user_email": user["email"],
-                "user_name": user["name"]
+                    "order_id": order_id,
+                    "order_number": order["order_number"],
+                    "service_type": "REPAIR",
+                    "location_address": order["location_address"],
+                    "total_amount": order["total_amount"],
+                    "scheduled_date": selected_slot["preferred_date"],
+                    "scheduled_time": selected_slot["preferred_time"],
+                    "estimated_end_time": end_datetime.time(),
+                    "contact_name": selected_slot.get("contact_name"),
+                    "contact_phone": selected_slot.get("contact_phone"),
+                    "user_email": user["email"],
+                    "user_name": user["name"],
                 }
             result = send_scheduling_success_email(order_data)
             email_sent = result.get("success", False)

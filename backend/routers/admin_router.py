@@ -12,7 +12,10 @@ from services.admin_service import (
     update_order_completion_status,
 )
 from services.booking_service import get_order_detail_service
-from services.scheduling_service import process_immediate_scheduling, process_repair_order
+from services.scheduling_service import (
+    process_immediate_scheduling,
+    process_repair_order,
+)
 from models.booking_model import OrderDetail
 import asyncpg
 from typing import Optional
@@ -95,12 +98,14 @@ async def schedule_order(
         elif order.service_type == "REPAIR":
             result = await process_repair_order(order_id, db, http_client)
             if not result["success"]:
-                raise HTTPException(status_code=409, detail=f"排程失敗: {result['reason']}")
+                raise HTTPException(
+                    status_code=409, detail=f"排程失敗: {result['reason']}"
+                )
             return result
         else:
             raise HTTPException(status_code=400, detail="未知的服務類型")
     except HTTPException:
-        raise  
+        raise
     except Exception as e:
         print(f"排程出現錯誤: {str(e)}")
         raise HTTPException(status_code=500, detail="排程出現錯誤")
