@@ -1,11 +1,12 @@
+<div align="center">
+  <img src="docs/images/logo.png" alt="Cool Slate" width="200">
+</div>
+
 # Cool Slate - 智能冷氣服務預約平台
 
 [![Demo](https://img.shields.io/badge/Demo-Live-brightgreen?style=flat-square)](https://cool-slate.ayating.workers.dev)
 
 **線上體驗 Demo:** [https://cool-slate.ayating.workers.dev](https://cool-slate.ayating.workers.dev)
-
-<!-- 建議：您可以錄製一段操作 GIF 放在這裡，效果會很好！ -->
-<!-- <img src="path/to/your/demo.gif" alt="專案操作展示"> -->
 
 ## 專案簡介
 
@@ -52,6 +53,10 @@ Cool Slate 是一個模擬真實業務規模的智能冷氣服務預約平台。
   - **Stripe 安全支付：** 串接 Stripe 處理線上信用卡付款。
   - **Webhook 即時同步：** 付款成功後，透過 Webhook 自動更新訂單狀態並觸發後續排程。
   - **Resend 自動化郵件：** 自動寄送排程完成、取消的通知，並附帶**一鍵加入行事曆的連結**。
+
+## 系統架構
+
+<img src="docs/images/architecture-overview.png" alt="系統架構圖" style="width: 100%; max-width: 800px;">
 
 ## 技術棧
 
