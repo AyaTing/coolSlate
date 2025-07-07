@@ -8,6 +8,7 @@ from routers import (
     payment_router,
     auth_router,
     admin_router,
+    product_router
 )
 from services.background_service import cleanup_loop, repair_scheduling_loop
 import asyncio
@@ -71,6 +72,7 @@ app.include_router(calendar_router.router)
 app.include_router(booking_router.router)
 app.include_router(payment_router.router)
 app.include_router(admin_router.router)
+app.include_router(product_router.router)
 
 
 @app.get("/status")
