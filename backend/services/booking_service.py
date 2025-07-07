@@ -245,11 +245,15 @@ async def calculate_order_amount(
                 status_code=400, detail="無效的服務類型，無法取得服務資訊"
             )
         pricing_type = service_info["pricing_type"]
-        if pricing_type == "equipment":  # 做完商品列表再確認
+        if pricing_type == "equipment":
             if equipment_details:
                 total = 0
                 for item in equipment_details:
-                    total += item.price * item.quantity
+                    select_query = "SELECT price FROM products WHERE model = $1 AND is_active = true"
+                    product = await db.fetchrow(select_query, item.model)
+                    if not product:
+                        raise HTTPException(status_code=400, detail=f"商品 {item.model} 不存在或已下架")
+                    total += product["price"] * item.quantity
                 return total
             else:
                 print(f"找不到 {service_type} 的設備價格")
@@ -272,9 +276,11 @@ async def calculate_order_amount(
             select_query = "SELECT lp.price FROM location_pricing lp    JOIN service_types st ON lp.service_type_id = st.id WHERE st.name = $1 AND lp.region = $2"
             price = await db.fetchval(select_query, service_type, region)
             return price or 1000
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"出現預期外錯誤，無法確認：{e}")
-        raise HTTPException(status_code=500, detail="出現預期外錯誤，無法確認")
+        print(f"計算訂單金額時發生錯誤: {e}")
+        raise HTTPException(status_code=500, detail="計算金額失敗")
 
 
 def determine_region(address: str):
