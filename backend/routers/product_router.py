@@ -6,7 +6,7 @@ from services.product_service import get_products
 
 router = APIRouter(prefix="/api", tags=["product"])
 
-@router.get("/product")
+@router.get("/products")
 async def get_products_endpoint(db: asyncpg.Connection = Depends(get_connection)):
     try:
        products_list = await get_products(db)
