@@ -7,36 +7,32 @@ import {
   type OrderRequest,
 } from "../services/servicesAPI.ts";
 import Calendar from "../components/Calendar";
-import BookingForm from "../components/BookingForm";
+import BookingForm, { type BookingFormData } from "../components/BookingForm";
 import { useBooking } from "../hooks/useBooking";
 import PaymentModal from "../components/PaymentModal";
 import { useAuth } from "../context/AuthContext";
 import LoginModal from "../components/LoginModal";
 
 type ServiceType = "新機安裝" | "冷氣保養" | "冷氣維修";
-
-interface BookingFormData {
-  service_type: string;
-  location_address: string;
-  unit_count: number;
-  notes: string;
-  booking_slots: Array<{
-    preferred_date: string;
-    preferred_time: string;
-    contact_name: string;
-    contact_phone: string;
-  }>;
-  equipment_details?: Array<{
-    name: string;
-    model: string;
-    price: number;
-    quantity: number;
-  }>;
-}
+const serviceTypeOptions: ServiceType[] = ["新機安裝", "冷氣保養", "冷氣維修"];
 
 const ServicePage = () => {
-  const [selectedService, setSelectedService] =
-    useState<ServiceType>("新機安裝");
+  const getDefaultServiceType = (): ServiceType => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const typeFromUrl = urlParams.get("type");
+    if (
+      typeFromUrl &&
+      serviceTypeOptions.includes(typeFromUrl as ServiceType)
+    ) {
+      return typeFromUrl as ServiceType;
+    }
+    return "新機安裝";
+  };
+
+  const [selectedService, setSelectedService] = useState<ServiceType>(
+    getDefaultServiceType()
+  );
+
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [isBookingFormOpen, setIsBookingFormOpen] = useState(false);
@@ -52,12 +48,6 @@ const ServicePage = () => {
   const [orderIdForPayment, setOrderIdForPayment] = useState<number | null>(
     null
   );
-
-  const serviceTypeOptions: ServiceType[] = [
-    "新機安裝",
-    "冷氣保養",
-    "冷氣維修",
-  ];
 
   const {
     createBooking,

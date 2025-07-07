@@ -85,18 +85,21 @@ const HomePage = () => {
           title="冷氣維修"
           description="不冷、漏水、異音？專業師傅快速檢測修復。"
           ctaText="預約維修"
+          ctaLink="/service?type=冷氣維修"
         />
         <ServiceItemCard
           imageElement={Images.installImg}
           title="新機安裝"
           description="新機安裝，提供標準化安裝服務。"
           ctaText="預約安裝"
+          ctaLink="/service?type=新機安裝"
         />
         <ServiceItemCard
           imageElement={Images.maintenanceImg}
           title="冷氣保養"
           description="冷氣深度清潔保養，提升效能，吹出健康風。"
           ctaText="預約清洗"
+          ctaLink="/service?type=冷氣保養"
         />
       </div>
     </div>
