@@ -4,23 +4,25 @@ import { useQuery } from "@tanstack/react-query";
 import {
   checkUnitsAvailability,
   checkBookingFeasibility,
+  getProducts,
+  type ProductResponse,
 } from "../services/servicesAPI";
 
-interface EquipmentItem {
+export interface EquipmentItem {
   name: string;
   model: string;
   price: number;
   quantity: number;
 }
 
-interface BookingSlot {
+export interface BookingSlot {
   preferred_date: string;
   preferred_time: string;
   contact_name: string;
   contact_phone: string;
 }
 
-interface BookingFormData {
+export interface BookingFormData {
   service_type: string;
   location_address: string;
   unit_count: number;
@@ -36,31 +38,6 @@ interface BookingFormProps {
   onSubmit: (data: BookingFormData) => void;
   onCancel: () => void;
 }
-
-// 模擬商品資料（新機安裝用）
-const MOCK_PRODUCTS = [
-  {
-    name: "大金變頻冷暖氣機",
-    model: "FTXS-50LVLT",
-    price: 45000,
-    image: "🌡️",
-    description: "適用4-6坪，一級能效，靜音運轉",
-  },
-  {
-    name: "三菱電機變頻冷氣",
-    model: "MSZ-FH35VA",
-    price: 38000,
-    image: "❄️",
-    description: "適用3-5坪，快速冷房，省電節能",
-  },
-  {
-    name: "國際牌變頻冷暖氣",
-    model: "CS-UX36BA2",
-    price: 42000,
-    image: "🔥",
-    description: "適用5-7坪，冷暖兼具，智慧控制",
-  },
-];
 
 const determineRegion = (address: string): string => {
   const keywords = ["台北", "新北"];
@@ -155,6 +132,16 @@ const BookingForm = ({
     staleTime: 30000,
   });
 
+  const {
+    data: products = [],
+    isLoading: isProductsLoading,
+    error: productsError,
+  } = useQuery({
+    queryKey: ["products"],
+    queryFn: getProducts,
+    staleTime: 30000,
+  });
+
   useEffect(() => {
     if (selectedDate && selectedTime) {
       setFormData((prev) => ({
@@ -223,7 +210,7 @@ const BookingForm = ({
     }));
   };
 
-  const addToCart = (product: (typeof MOCK_PRODUCTS)[0]) => {
+  const addToCart = (product: ProductResponse) => {
     const existingItem = cart.find((item) => item.model === product.model);
 
     if (existingItem) {
@@ -460,35 +447,44 @@ const BookingForm = ({
             )}
 
             <div className="grid gap-4">
-              {MOCK_PRODUCTS.map((product) => (
-                <div
-                  key={product.model}
-                  className="border border-gray-200 rounded-lg p-4"
-                >
-                  <div className="flex items-start gap-2 md:gap-4">
-                    <div className="text-lg md:text-4xl">{product.image}</div>
-                    <div className="flex-1">
-                      <h5 className="font-medium text-gray-900">
-                        {product.name}
-                      </h5>
-                      <p className="text-sm text-gray-500">{product.model}</p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {product.description}
-                      </p>
-                      <p className="text-lg font-semibold text-[var(--color-brand-primary)] mt-2">
-                        NT$ {product.price.toLocaleString()}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => addToCart(product)}
-                      className="px-4 py-2 bg-[var(--color-brand-primary)] text-white rounded-lg hover:opacity-90 text-sm"
-                    >
-                      加入
-                    </button>
-                  </div>
+              {productsError && (
+                <div className="text-red-500 p-4 text-center">
+                  商品載入失敗，請重試
                 </div>
-              ))}
+              )}
+              {isProductsLoading ? (
+                <div className="text-center py-4">載入商品中...</div>
+              ) : (
+                products.map((product) => (
+                  <div
+                    key={product.model}
+                    className="border border-gray-200 rounded-lg p-4"
+                  >
+                    <div className="flex items-start gap-2 md:gap-4">
+                      <div className="text-lg md:text-4xl">{product.image}</div>
+                      <div className="flex-1">
+                        <h5 className="font-medium text-gray-900">
+                          {product.name}
+                        </h5>
+                        <p className="text-sm text-gray-500">{product.model}</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {product.description}
+                        </p>
+                        <p className="text-lg font-semibold text-[var(--color-brand-primary)] mt-2">
+                          NT$ {product.price.toLocaleString()}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addToCart(product)}
+                        className="px-4 py-2 bg-[var(--color-brand-primary)] text-white rounded-lg hover:opacity-90 text-sm"
+                      >
+                        加入
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             {cart.length > 0 && (

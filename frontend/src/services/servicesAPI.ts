@@ -128,7 +128,18 @@ export interface OrderResponse {
   service_type: string;
 }
 
-function toBackendServiceType(frontendType: string): string {
+export interface ProductResponse {
+  id: number;
+  name: string;
+  model: string;
+  price: number;
+  image: string;
+  description?: string;
+  category: string;
+  is_active: boolean;
+}
+
+const toBackendServiceType = (frontendType: string): string => {
   const mapped =
     SERVICE_TYPE_MAP[frontendType as keyof typeof SERVICE_TYPE_MAP];
   if (!mapped) {
@@ -136,9 +147,9 @@ function toBackendServiceType(frontendType: string): string {
   }
 
   return mapped;
-}
+};
 
-export function toFrontendServiceType(backendType: string): string {
+export const toFrontendServiceType = (backendType: string): string => {
   const mapped =
     SERVICE_TYPE_REVERSE_MAP[
       backendType as keyof typeof SERVICE_TYPE_REVERSE_MAP
@@ -147,7 +158,7 @@ export function toFrontendServiceType(backendType: string): string {
     return backendType;
   }
   return mapped;
-}
+};
 
 async function apiCall<T>(
   endpoint: string,
@@ -343,4 +354,8 @@ export const createOrder = async (
     ...data,
     service_type: toFrontendServiceType(data.service_type),
   };
+};
+
+export const getProducts = async (): Promise<ProductResponse[]> => {
+  return await apiCall<ProductResponse[]>("/products", {}, false);
 };
