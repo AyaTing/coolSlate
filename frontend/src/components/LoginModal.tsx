@@ -1,4 +1,3 @@
-// src/components/LoginModal.tsx
 import { useEffect, useRef } from "react";
 import { useGoogleLogin } from "../hooks/useAuth";
 

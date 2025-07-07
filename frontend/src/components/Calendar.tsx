@@ -1,4 +1,3 @@
-// src/components/Calendar.tsx
 import { type CalendarDay } from "../services/servicesAPI.ts";
 
 interface CalendarProps {
@@ -66,7 +65,6 @@ const Calendar = ({
 
   return (
     <div className="bg-white rounded-lg shadow-sm border">
-      {/* 月份標題與導航 */}
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-4">
           <h3 className="text-lg font-semibold text-gray-800">
