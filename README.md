@@ -8,6 +8,12 @@
 
 **線上體驗 Demo:** [https://cool-slate.ayating.workers.dev](https://cool-slate.ayating.workers.dev)
 
+## 使用者測試帳號
+
+**電子信箱**：eakonn.test@gmail.com
+
+**密碼**：coolslate
+
 ## 專案簡介
 
 Cool Slate 是一個模擬真實業務規模的智能冷氣服務預約平台。設計初衷源於觀察到傳統冷氣業者普遍依賴電話人工預約，容易產生時段衝突、人力調度混亂等痛點。
@@ -136,7 +142,7 @@ Cool Slate 是一個模擬真實業務規模的智能冷氣服務預約平台。
     - 排程確認後，系統透過 **Resend API** 發送郵件給使用者。
     - 服務完成後，管理員可上傳 PDF 完工報告至 **AWS S3**，檔案透過 **AWS CloudFront CDN** 加速分發。
 
-5.  **自動化維運 (CI/CD):**
+5.  **自動化維運 (CI/CD):** ⚠️ CI/CD 因資安考量暫停（代碼功能正常）
     - **前端自動部署:** 專案與 GitHub 儲存庫連結，當主分支更新時，自動觸發 **Cloudflare Workers** 進行建構與部署。
     - **後端持續整合與部署:**
       - 使用 **GitHub Actions CI/CD**，配合部署在 **AWS EC2** 上的 **Self-hosted Runner**，於程式碼變更時自動執行建構 Docker Image、推送與部署流程。
