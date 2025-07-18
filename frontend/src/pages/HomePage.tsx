@@ -81,13 +81,6 @@ const HomePage = () => {
       </section>
       <div className="grid sm:grid-cols-3 gap-4 lg:gap-6 p-3 md:p-4 bg-gradient-to-br from-[var(--color-brand-primary-light)]/10 via-transparent to-[var(--color-brand-secondary)] rounded-xl shadow-sm">
         <ServiceItemCard
-          imageElement={Images.repairImg}
-          title="冷氣維修"
-          description="不冷、漏水、異音？專業師傅快速檢測修復。"
-          ctaText="預約維修"
-          ctaLink="/service?type=冷氣維修"
-        />
-        <ServiceItemCard
           imageElement={Images.installImg}
           title="新機安裝"
           description="新機安裝，提供標準化安裝服務。"
@@ -100,6 +93,13 @@ const HomePage = () => {
           description="冷氣深度清潔保養，提升效能，吹出健康風。"
           ctaText="預約清洗"
           ctaLink="/service?type=冷氣保養"
+        />
+        <ServiceItemCard
+          imageElement={Images.repairImg}
+          title="冷氣維修"
+          description="不冷、漏水、異音？專業師傅快速檢測修復。"
+          ctaText="預約維修"
+          ctaLink="/service?type=冷氣維修"
         />
       </div>
     </div>
